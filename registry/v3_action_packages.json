@@ -1,0 +1,52 @@
+{
+  "registry_kind": "fortipam_v3_action_package_registry",
+  "schema_version": "1.0.0",
+  "product": "FortiPAM",
+  "product_version_scope": "1.9.1",
+  "status": "design_only",
+  "packages": [
+    {
+      "id": "folder-create",
+      "version": "3.2.0",
+      "name": "FortiPAM Folder Create Contract-Readiness Candidate",
+      "product": "FortiPAM",
+      "object_kind": "secret/folder",
+      "evidence_status": "evidence_pending",
+      "evidence_refs": [],
+      "evidence_gaps": [
+        "Exact approved write method is unknown.",
+        "Exact approved write path is unknown; object_kind is not an API path.",
+        "Exact request body and field validation contract are unknown.",
+        "Response schema and fixed post-write readback projection are unknown.",
+        "Least-privilege permission mapping for this mutation is unknown.",
+        "Idempotency, uniqueness, concurrency, and duplicate handling are unknown.",
+        "Rollback or compensation semantics are unknown.",
+        "Owner-accepted positive, negative, drift, timeout, and readback lab evidence is missing."
+      ],
+      "lifecycle": "catalogued",
+      "status": "disabled_by_policy",
+      "maturity": "catalogued",
+      "method": "unknown",
+      "path": "unknown",
+      "body": "unknown",
+      "executable": false,
+      "adapter": "none",
+      "mcp_exposed": false,
+      "registered_tool": false,
+      "dispatchable": false,
+      "device_access": false,
+      "max_affected": 1,
+      "c3_material_allowed": false,
+      "required_gates": [
+        "approved_product_contract",
+        "fixed_minimized_current_state_projection",
+        "least_privilege_identity_mapping",
+        "final_intent_confirmation_and_independent_approval",
+        "pre_write_reread_and_drift_check",
+        "fixed_post_write_readback",
+        "rollback_or_compensation_plan",
+        "owner_accepted_lab_evidence"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "fortipam-security-copilot",
+  "version": "1.7.0",
+  "description": "Governed FortiPAM Security Copilot with source-traceable read-only evidence, plan-only administrative Skills, and a minimized OAuth MCP surface.",
+  "author": {
+    "name": "lxtsst",
+    "url": "https://github.com/lxtsst"
+  },
+  "homepage": "https://github.com/lxtsst/fortipam-mcp-server",
+  "repository": "https://github.com/lxtsst/fortipam-mcp-server",
+  "license": "MIT",
+  "keywords": ["fortipam", "fortinet", "pam", "security", "mcp"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "FortiPAM Security Copilot",
+    "shortDescription": "Diagnose FortiPAM safely with bounded read-only evidence.",
+    "longDescription": "Connects Codex to a read-only FortiPAM MCP service and adds product-aware guidance for health, approval, identity, session, gateway, ZTNA access and protected Secret launch, logging, HA, and password-lifecycle triage.",
+    "developerName": "lxtsst",
+    "category": "Security",
+    "capabilities": ["Read-only FortiPAM evidence", "Plan-only administrator workflows", "ZTNA access and Secret launch control", "Capability matrix", "Focused FortiPAM Skills", "OAuth MCP"],
+    "defaultPrompt": [
+      "Assess my FortiPAM health with read-only evidence.",
+      "Build a safe evidence plan for this FortiPAM issue.",
+      "Check which FortiPAM MCP capabilities can answer my question."
+    ],
+    "brandColor": "#EE3124"
+  },
+  "mcpServers": "./.mcp.json"
+}

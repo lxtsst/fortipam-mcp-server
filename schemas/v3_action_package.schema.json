@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fortipam.local/schemas/v3-action-package.schema.json",
+  "title": "FortiPAM V3.2 Action Package Registry",
+  "$comment": "Contract-readiness metadata only. This schema never authorizes an adapter, executable action, device write, or MCP Tool registration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registry_kind", "schema_version", "product", "product_version_scope", "status", "packages"],
+  "properties": {
+    "registry_kind": {"const": "fortipam_v3_action_package_registry"},
+    "schema_version": {"const": "1.0.0"},
+    "product": {"const": "FortiPAM"},
+    "product_version_scope": {"const": "1.9.1"},
+    "status": {"const": "design_only"},
+    "packages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {"$ref": "#/$defs/action_package"}
+    }
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "non_empty_strings": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "action_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "version", "name", "product", "object_kind", "evidence_status",
+        "evidence_refs", "evidence_gaps", "lifecycle", "status", "maturity",
+        "method", "path", "body", "executable", "adapter", "mcp_exposed",
+        "registered_tool", "dispatchable", "device_access", "max_affected",
+        "c3_material_allowed", "required_gates"
+      ],
+      "properties": {
+        "id": {"const": "folder-create"},
+        "version": {"const": "3.2.0"},
+        "name": {"const": "FortiPAM Folder Create Contract-Readiness Candidate"},
+        "product": {"const": "FortiPAM"},
+        "object_kind": {"const": "secret/folder"},
+        "evidence_status": {"const": "evidence_pending"},
+        "evidence_refs": {"type": "array", "maxItems": 0, "items": {"type": "string"}},
+        "evidence_gaps": {"$ref": "#/$defs/non_empty_strings"},
+        "lifecycle": {"const": "catalogued"},
+        "status": {"const": "disabled_by_policy"},
+        "maturity": {"const": "catalogued"},
+        "method": {"const": "unknown"},
+        "path": {"const": "unknown"},
+        "body": {"const": "unknown"},
+        "executable": {"const": false},
+        "adapter": {"const": "none"},
+        "mcp_exposed": {"const": false},
+        "registered_tool": {"const": false},
+        "dispatchable": {"const": false},
+        "device_access": {"const": false},
+        "max_affected": {"const": 1},
+        "c3_material_allowed": {"const": false},
+        "required_gates": {"$ref": "#/$defs/non_empty_strings"}
+      }
+    }
+  }
+}

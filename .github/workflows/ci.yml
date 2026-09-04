@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-release:
+    name: deterministic-release (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install project and development dependencies
+        run: >-
+          python -m pip install
+          --constraint deploy/docker/runtime-constraints.txt
+          hatchling==1.32.0
+          --editable '.[dev]'
+
+      - name: Check repository hygiene
+        run: python scripts/check_repository_hygiene.py
+
+      - name: Verify deterministic release
+        run: python scripts/verify_release.py

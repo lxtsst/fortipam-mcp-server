@@ -1,0 +1,261 @@
+schema_version: "1.0"
+status: design_only
+product:
+  name: FortiPAM
+  target_version: "1.9.1"
+  primary_source:
+    source_id: fortipam-1.9.1-administration-guide
+    evidence_status: documented
+    note: "Product behavior authority only; it is not an API or permission contract."
+evidence_status_values:
+  verified: "Observed in a bounded non-production test and retained as compatibility evidence."
+  documented: "Stated by a primary product or IaC source; not necessarily independently observed."
+  inferred: "Architecture inference; requires validation before use."
+  unknown: "No trustworthy contract is currently available."
+  not_applicable: "This transport is outside the named action family; it is not an authorization decision."
+global_invariants:
+  - "No matrix row authorizes an endpoint, CLI command, Terraform apply, or FortiPAM write."
+  - "An omitted API path/method means unknown, not unavailable or safe to infer."
+  - "A product-object mention does not establish route-to-role or least-privilege mapping."
+  - "All rows are disabled until a versioned adapter contract, dedicated identity, and acceptance evidence exist."
+  - "Every mutable action additionally requires a valid human intent confirmation bound to the exact Final Intent Summary digest/revision."
+  - "Every mutable action needs fixed minimized authoritative current-state and postcondition projections with verified query permissions; no projection means no write."
+  - "C3 material must be delivered only through the C3 Material Provider design."
+actions:
+  - action_family: folder.create
+    object_model: [PublicFolder]
+    business_capability_status: documented
+    api_contract:
+      status: unknown
+      method: null
+      path: null
+      source: null
+    cli_contract:
+      status: unknown
+      command: null
+      source: null
+    iac_contract:
+      status: unknown
+      resource: null
+      source: null
+    permission_contract:
+      status: unknown
+      required_permission: null
+    c_class: C2
+    activation: disabled
+    next_evidence: "Versioned schema, fixed adapter mapping, product permission readback, positive/negative lab probes."
+    projection_evidence:
+      current_state: unknown
+      postcondition: unknown
+      query_permission: unknown
+  - action_family: folder.acl.grant
+    object_model: [PublicFolder, FolderAclGrant, Group, Role]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Inheritance/SoD test, exact permission matrix, cross-scope denial, rollback contract."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: target.create
+    object_model: [Target, TargetConnectivity, AddressReference]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Typed target schema, protocol allowlist, source restriction, post-create readback, compensating disable/delete review."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: secret.create-from-reference
+    object_model: [SecretMetadata, SecretTemplate, C3MaterialBinding]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract:
+      status: documented
+      resource: "fortinetdev/fortipam resource_secret"
+      source: "Fortinet Terraform FortiPAM provider documentation"
+      caveat: "Provider documentation includes value-bearing configuration; it cannot be used as a C3 transport or an apply authorization."
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C3
+    activation: disabled
+    next_evidence: "C3 lease design acceptance, fixed metadata/material boundary, no-readback proof, dedicated product permission matrix."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: secret.update-metadata
+    object_model: [SecretMetadata, SecretTemplate]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: inferred, resource: null, source: "Provider capability requires exact version review."}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "No-C3 delta contract, schema validation, expected-current and postcondition tests."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: launcher.create-or-update
+    object_model: [LauncherProfile, SecretTemplate, SessionSecurityPolicy]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Fixed field allowlist, executable/path prohibition, client compatibility and rollback evidence."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: approval-policy.configure
+    object_model: [ApprovalPolicy, AccessRequest, ObservationPolicy]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C4
+    activation: disabled
+    next_evidence: "Requester/approver separation, notification safety, self-approval denial, and request lifecycle lab tests."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: local-user.create-or-disable
+    object_model: [User, Group, Role, IdentitySource]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Authoritative source check, identity lifecycle/expiry contract, credential-delivery exclusion, offboarding verification."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: session-security-policy.configure
+    object_model: [SessionSecurityPolicy, LauncherProfile, ObservationPolicy]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Protocol-specific lab test, DLP/filter effect evidence, false-positive/negative handling, safe rollback."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: platform.backup-or-restore
+    object_model: [ControlledPlan, Verification, Reconciliation]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: unknown, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C4
+    activation: disabled
+    next_evidence: "Explicit irreversible/high-impact class, isolated recovery lab, owner acceptance, stop/rollback evidence."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: terraform-plan-review
+    object_model: [ControlledPlan]
+    business_capability_status: documented
+    api_contract: {status: not_applicable, method: null, path: null, source: null}
+    cli_contract: {status: not_applicable, command: null, source: null}
+    iac_contract:
+      status: documented
+      resource: "Terraform FortiPAM provider documentation"
+      source: "Fortinet Terraform FortiPAM provider documentation"
+      caveat: "Review/generation can be designed; Terraform apply remains a separate runner and approval boundary."
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C4
+    activation: disabled
+    next_evidence: "Sanitized plan parser, state/C3 exclusion, signed runner contract, independent apply acceptance."
+    projection_evidence: {current_state: not_applicable, postcondition: not_applicable, query_permission: not_applicable}
+  - action_family: ztna-access-proxy-client-certificate-policy
+    object_model: [AccessProxy, CertificateTrust]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract:
+      status: documented
+      command: "config firewall access-proxy (fixed object adapter only)"
+      source: "FortiPAM 1.9.1 Administration Guide pp. 499-503"
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C4
+    activation: disabled
+    next_evidence: "Exact get/set/unset template, effective-value projection, empty-cert-action decision, lockout recovery, HA and rollback acceptance."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: ztna-access-level-proxy-policy
+    object_model: [AccessProxyPolicy, EmsTagReference]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract:
+      status: documented
+      command: "config firewall policy (fixed access-proxy policy adapter only)"
+      source: "FortiPAM 1.9.1 Administration Guide pp. 497, 500-503"
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C4
+    activation: disabled
+    next_evidence: "Exact ztna-status/tag current-state and rollback projections, portal lockout negative test, least-privilege CLI role and HA acceptance."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: ztna-folder-or-secret-control
+    object_model: [SecretFolder, SecretMetadata, EmsTagReference]
+    business_capability_status: documented
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract: {status: not_applicable, command: null, source: null}
+    iac_contract: {status: unknown, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Exact 1.9.1 Folder/Secret read-write-readback schema, inheritance and AND/OR semantics, object permission, rollback, positive/negative/unaffected launch tests."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+  - action_family: ztna-device-context-diagnostic
+    object_model: [EmsConnection, EndpointPosture, AccessProxy, WadDeviceContext]
+    business_capability_status: verified
+    api_contract: {status: unknown, method: null, path: null, source: null}
+    cli_contract:
+      status: verified
+      command: "fixed effective access-proxy, dynamic-list and WAD device-context projection"
+      source: "Sanitized FortiPAM 1.9.1 compatibility evidence"
+    iac_contract: {status: not_applicable, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C2
+    activation: disabled
+    next_evidence: "Opaque endpoint reference resolution, bounded parsers, identifier/token non-disclosure, stale-context handling, positive/negative permission probes."
+    projection_evidence: {current_state: unknown, postcondition: not_applicable, query_permission: unknown}
+  - action_family: ztna-wad-debug-capture
+    object_model: [WadDiagnosticWindow, SanitizedEvidence]
+    business_capability_status: verified
+    api_contract: {status: not_applicable, method: null, path: null, source: null}
+    cli_contract:
+      status: verified
+      command: "fixed time-boxed WAD debug categories with mandatory disable cleanup"
+      source: "Sanitized FortiPAM 1.9.1 compatibility evidence"
+    iac_contract: {status: not_applicable, resource: null, source: null}
+    permission_contract: {status: unknown, required_permission: null}
+    c_class: C4
+    activation: disabled
+    next_evidence: "Separate confirmation, automatic timeout and finally cleanup, bounded capture, strict redaction/projector tests, cancellation/failure injection, lab acceptance."
+    projection_evidence: {current_state: unknown, postcondition: unknown, query_permission: unknown}
+
+# Machine-checked coverage of every V4 registry action-family placeholder. These
+# rows are intentionally disabled evidence gaps; they do not authorize a route,
+# permission, adapter, credential, or MCP Tool.
+placeholder_coverage:
+  - {registry_action_ref: secure-platform-foundation-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: administrator-identity-and-mfa-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: federated-identity-lifecycle-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: access-domain-and-ownership-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: linux-ssh-and-file-transfer-access-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: windows-and-ad-privileged-access-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: web-and-application-credential-access-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: approval-checkout-jit-and-jobs-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: dlp-and-session-security-controls-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: segmented-private-target-connectivity-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: fortigate-ztna-publication-and-launcher-continuity-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: logging-recording-audit-and-alerting-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: credential-rotation-and-service-dependency-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: discovery-and-smart-association-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: sponsored-and-temporary-access-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: event-automation-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: certificate-and-endpoint-trust-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: platform-resilience-and-lifecycle-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: devops-and-specialized-secrets-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: specialized-launcher-onboarding-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}
+  - {registry_action_ref: ztna-access-and-secret-launch-control-plan, coverage_status: evidence_gap, gap_owner: owner_required, activation: disabled}

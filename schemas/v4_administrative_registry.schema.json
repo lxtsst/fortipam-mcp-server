@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fortipam.local/schemas/v4-administrative-registry.schema.json",
+  "title": "FortiPAM V4 Administrative Registry",
+  "$comment": "Cross-record source propagation, orphan-source rejection, and exact Scheme/Action provenance unions are enforced by scripts/v4_registry.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registry_kind", "schema_version", "status", "product", "product_version_scope",
+    "data_boundary", "sources", "blueprints", "skill_skus", "workflow_skills", "schemes", "actions"
+  ],
+  "properties": {
+    "registry_kind": {"const": "fortipam_v4_administrative_registry"},
+    "schema_version": {"$ref": "#/$defs/semver"},
+    "status": {"const": "design_only"},
+    "product": {"const": "FortiPAM"},
+    "product_version_scope": {"type": "string", "minLength": 1},
+    "data_boundary": {"type": "string", "pattern": "C3"},
+    "sources": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/source"}},
+    "blueprints": {"type": "array", "minItems": 21, "maxItems": 21, "items": {"$ref": "#/$defs/blueprint"}},
+    "skill_skus": {"type": "array", "minItems": 21, "maxItems": 21, "items": {"$ref": "#/$defs/skill_sku"}},
+    "workflow_skills": {"type": "array", "minItems": 40, "maxItems": 40, "items": {"$ref": "#/$defs/workflow_skill"}},
+    "schemes": {"type": "array", "minItems": 16, "maxItems": 16, "items": {"$ref": "#/$defs/scheme"}},
+    "actions": {"type": "array", "minItems": 21, "maxItems": 21, "items": {"$ref": "#/$defs/action"}}
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "non_empty_strings": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "source_ref_list": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^FPA-SRC-[A-Z0-9-]+$"}},
+    "status": {"enum": ["design_only", "planned", "lab_accepted", "disabled_by_policy", "enabled_by_policy"]},
+    "maturity": {"enum": ["catalogued", "designed", "implemented", "contract_tested", "lab_accepted", "policy_enabled", "production_qualified"]},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "authority"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^FPA-SRC-[A-Z0-9-]+$"},
+        "title": {"type": "string", "minLength": 1},
+        "authority": {"type": "string", "minLength": 1}
+      }
+    },
+    "intent_confirmation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required", "version", "digest_algorithm", "binds", "c3_included", "invalidated_by", "lifecycle", "current_state_projection", "digest_fields", "read_authority_required", "pre_write_reread_required", "pre_write_drift_invalidates", "post_readback_required", "raw_responses_allowed", "material_reference_metadata_policy"],
+      "properties": {
+        "required": {"const": true},
+        "version": {"const": "1.0.0"},
+        "digest_algorithm": {"const": "sha-256"},
+        "binds": {"type": "array", "minItems": 13, "uniqueItems": true, "items": {"enum": ["authenticated_requester", "summary_digest", "summary_revision", "environment", "scope", "object_set", "action_set", "assumptions", "effects", "risk", "material_reference_metadata", "verification", "compensation"]}},
+        "c3_included": {"const": false},
+        "invalidated_by": {"type": "array", "minItems": 18, "uniqueItems": true, "items": {"enum": ["requester_change", "summary_change", "summary_revision_change", "scope_change", "object_set_change", "action_set_change", "assumption_change", "effects_change", "risk_change", "material_reference_metadata_change", "verification_change", "compensation_change", "current_state_digest_change", "proposed_changes_digest_change", "expected_state_digest_change", "projection_change", "freshness_expired", "version_change"]}},
+        "lifecycle": {"const": ["read", "preview", "confirm", "reread_compare", "write", "post_read_verify"]},
+        "current_state_projection": {"const": "fixed_minimized_non_secret_projection"},
+        "digest_fields": {"const": ["current_state_digest", "proposed_changes_digest", "expected_state_digest"]},
+        "read_authority_required": {"const": true},
+        "pre_write_reread_required": {"const": true},
+        "pre_write_drift_invalidates": {"const": true},
+        "post_readback_required": {"const": true},
+        "raw_responses_allowed": {"const": false}
+        ,"material_reference_metadata_policy": {
+          "type": "object", "additionalProperties": false,
+          "required": ["allowed_fields", "forbidden_fields", "c3_values_included"],
+          "properties": {
+            "allowed_fields": {"const": ["provider_class", "purpose", "lifecycle"]},
+            "forbidden_fields": {"const": ["handle", "name", "account", "path", "url", "vendor_locator"]},
+            "c3_values_included": {"const": false}
+          }
+        }
+      }
+    },
+    "blueprint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "priority", "name", "skill_sku", "workflow_skill_refs", "scheme_refs", "source_refs", "required_information", "acceptance", "action_refs", "status", "maturity", "c3_material_allowed"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^FPA-BP-[0-9]{3}$"}, "version": {"$ref": "#/$defs/semver"}, "priority": {"enum": ["P0", "P1", "P2"]}, "name": {"type": "string", "minLength": 1}, "skill_sku": {"type": "string", "pattern": "^FPA-SK-[0-9]{3}$"}, "workflow_skill_refs": {"$ref": "#/$defs/non_empty_strings"}, "scheme_refs": {"$ref": "#/$defs/non_empty_strings"}, "source_refs": {"$ref": "#/$defs/source_ref_list"}, "required_information": {"$ref": "#/$defs/non_empty_strings"}, "acceptance": {"$ref": "#/$defs/non_empty_strings"}, "action_refs": {"$ref": "#/$defs/non_empty_strings"}, "status": {"const": "design_only"}, "maturity": {"const": "catalogued"}, "c3_material_allowed": {"const": false}
+      }
+    },
+    "skill_sku": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "name", "blueprint_ref", "workflow_skill_refs", "scheme_refs", "source_refs", "required_information", "acceptance", "status", "maturity", "c3_material_allowed"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^FPA-SK-[0-9]{3}$"}, "version": {"$ref": "#/$defs/semver"}, "name": {"type": "string", "minLength": 1}, "blueprint_ref": {"type": "string", "pattern": "^FPA-BP-[0-9]{3}$"}, "workflow_skill_refs": {"$ref": "#/$defs/non_empty_strings"}, "scheme_refs": {"$ref": "#/$defs/non_empty_strings"}, "source_refs": {"$ref": "#/$defs/source_ref_list"}, "required_information": {"$ref": "#/$defs/non_empty_strings"}, "acceptance": {"$ref": "#/$defs/non_empty_strings"}, "status": {"const": "design_only"}, "maturity": {"const": "catalogued"}, "c3_material_allowed": {"const": false}
+      }
+    },
+    "workflow_skill": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "name", "category", "purpose", "blueprint_refs", "scheme_refs", "source_refs", "required_information", "status", "maturity", "c3_material_allowed"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^fortipam-[a-z0-9-]{3,63}$"}, "version": {"$ref": "#/$defs/semver"}, "name": {"type": "string", "minLength": 1}, "category": {"type": "string", "minLength": 1}, "purpose": {"type": "string", "minLength": 1}, "blueprint_refs": {"$ref": "#/$defs/non_empty_strings"}, "scheme_refs": {"$ref": "#/$defs/non_empty_strings"}, "source_refs": {"$ref": "#/$defs/source_ref_list"}, "required_information": {"$ref": "#/$defs/non_empty_strings"}, "status": {"const": "design_only"}, "maturity": {"const": "catalogued"}, "c3_material_allowed": {"const": false}
+      }
+    },
+    "scheme": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "name", "purpose", "blueprint_refs", "source_refs", "lifecycle", "status", "maturity", "c3_material_allowed", "required_sections", "intent_confirmation"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+Scheme$"}, "version": {"$ref": "#/$defs/semver"}, "name": {"type": "string", "minLength": 1}, "purpose": {"type": "string", "minLength": 1}, "blueprint_refs": {"$ref": "#/$defs/non_empty_strings"}, "source_refs": {"$ref": "#/$defs/source_ref_list"}, "lifecycle": {"enum": ["catalogued", "contract_tested"]}, "status": {"enum": ["design_only", "planned"]}, "maturity": {"enum": ["catalogued", "contract_tested"]}, "c3_material_allowed": {"const": false}, "required_sections": {"$ref": "#/$defs/non_empty_strings"}, "intent_confirmation": {"$ref": "#/$defs/intent_confirmation"}, "implementation_evidence": {"$ref": "#/$defs/implementation_evidence"}
+      }
+    },
+    "implementation_evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence_status", "evidence_kind", "profile_blueprint_refs", "module_refs", "test_refs", "dispatchable", "runtime_packaged", "mcp_exposed", "device_access"],
+      "properties": {
+        "evidence_status": {"enum": ["pending_contract_tests", "contract_tested"]},
+        "evidence_kind": {"const": "fake_only_contract"},
+        "profile_blueprint_refs": {"type": "array", "minItems": 1, "maxItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^FPA-BP-[0-9]{3}$"}},
+        "module_refs": {"const": ["scripts/v4_planning.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/__init__.py"]},
+        "test_refs": {"const": ["tests/test_v4_planning.py"]},
+        "dispatchable": {"const": false},
+        "runtime_packaged": {"const": false},
+        "mcp_exposed": {"const": false},
+        "device_access": {"const": false}
+      }
+    },
+    "action": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "name", "product", "blueprint_refs", "scheme_refs", "source_refs", "risk_tier", "lifecycle", "status", "maturity", "executable", "adapter", "max_affected", "forward", "rollback", "c3_material_allowed", "intent_confirmation", "record_kind", "atomic_contract"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"}, "version": {"$ref": "#/$defs/semver"}, "name": {"type": "string", "minLength": 1}, "product": {"const": "FortiPAM"}, "blueprint_refs": {"$ref": "#/$defs/non_empty_strings"}, "scheme_refs": {"$ref": "#/$defs/non_empty_strings"}, "source_refs": {"$ref": "#/$defs/source_ref_list"}, "risk_tier": {"enum": ["low", "medium", "high"]}, "lifecycle": {"const": "catalogued"}, "status": {"const": "design_only"}, "maturity": {"const": "catalogued"}, "executable": {"const": false}, "adapter": {"const": "none"}, "max_affected": {"const": 1}, "forward": {"$ref": "#/$defs/unbound_operation"}, "rollback": {"$ref": "#/$defs/unbound_operation"}, "c3_material_allowed": {"const": false}, "intent_confirmation": {"$ref": "#/$defs/intent_confirmation"}, "record_kind": {"const": "action_family_placeholder"}, "atomic_contract": {"const": false}
+      }
+    },
+    "unbound_operation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["binding", "method", "expected_current_required", "postcondition_required"],
+      "properties": {"binding": {"const": "unbound"}, "method": {"const": "UNBOUND"}, "path": {"type": "null"}, "expected_current_required": {"const": true}, "postcondition_required": {"const": true}, "strategy": {"const": "reconcile_or_manual"}}
+    }
+  }
+}

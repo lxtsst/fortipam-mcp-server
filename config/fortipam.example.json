@@ -1,0 +1,16 @@
+{
+  "health_path": "/api/v2/monitor/system/status",
+  "allowed_read_paths": [
+    "/api/v2/monitor/system/status",
+    "/api/v2/cmdb/system/global",
+    "/api/v2/cmdb/secret/approval-profile",
+    "/api/v2/cmdb/log.fortianalyzer/setting",
+    "/api/v2/monitor/license/status",
+    "/api/v2/cmdb/system/ha",
+    "/api/v2/monitor/log/current-disk-usage",
+    "/api/v2/cmdb/secret/password-changer",
+    "/api/v2/monitor/endpoint-control/ems/status-summary"
+  ],
+  "token_transport": "bearer",
+  "timeout_seconds": 15
+}

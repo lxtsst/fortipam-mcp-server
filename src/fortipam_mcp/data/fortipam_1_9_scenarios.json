@@ -1,0 +1,593 @@
+{
+  "schema_version": "1.0",
+  "catalog_kind": "fortipam_operational_scenarios",
+  "product": "FortiPAM",
+  "knowledge_version": "2026.08.22-v10",
+  "generated_at": "2026-08-22T16:00:00Z",
+  "review_after": "2026-11-19",
+  "sources": [
+    {
+      "source_id": "fortipam-1-9-1-admin",
+      "evidence_class": "official_documentation",
+      "title": "FortiPAM 1.9.1 Administration Guide",
+      "product_version": "1.9.1",
+      "accessed_at": "2026-08-21",
+      "locator": "https://fortinetweb.s3.amazonaws.com/docs.fortinet.com/v2/attachments/4603b8e3-650f-11f1-a33a-02356ffb40d9/FortiPAM-1.9.1-Administration_Guide.pdf",
+      "boundary": "Primary product-behavior authority; not a REST schema and not execution authorization."
+    },
+    {
+      "source_id": "fortipam-1-9-1-release",
+      "evidence_class": "official_release_notes",
+      "title": "FortiPAM 1.9.1 Release Notes",
+      "product_version": "1.9.1 build 1758",
+      "accessed_at": "2026-08-21",
+      "locator": "https://fortinetweb.s3.amazonaws.com/docs.fortinet.com/v2/attachments/4603d000-650f-11f1-a33a-02356ffb40d9/FortiPAM-1.9.1-Release-Notes.pdf",
+      "boundary": "Version delta, upgrade, support, resolved-issue, and capacity authority."
+    },
+    {
+      "source_id": "fortipam-1-9-0-api-catalog",
+      "evidence_class": "sanitized_api_catalog",
+      "title": "FortiPAM 1.9.0 FNDN UI runtime metadata",
+      "product_version": "1.9.0",
+      "accessed_at": "2026-08-20",
+      "locator": "packaged:fortipam_1_9_runtime_catalog.json",
+      "boundary": "API discovery and risk classification only; incomplete and never a callable router."
+    },
+    {
+      "source_id": "fortipam-1-9-1-compatibility",
+      "evidence_class": "sanitized_compatibility_observation",
+      "title": "FortiPAM 1.9.1 fixed-read compatibility observation",
+      "product_version": "1.9.1",
+      "accessed_at": "2026-08-21",
+      "locator": "packaged:compatibility-observation",
+      "boundary": "Validates only named fixed-read behavior in a bounded non-production test environment."
+    },
+    {
+      "source_id": "fortipam-derived-notes",
+      "evidence_class": "derived_operational_knowledge",
+      "title": "Reviewed FortiPAM operational notes",
+      "product_version": "1.9.0 control baseline with 1.9.1 watch items",
+      "accessed_at": "2026-08-21",
+      "locator": "derived:reviewed-operational-notes",
+      "boundary": "Scenario seed only; maker-reviewed, independently unreviewed, and lab-unvalidated."
+    },
+    {
+      "source_id": "community-web-launcher-permission",
+      "evidence_class": "fortinet_community_technical_tip",
+      "title": "Clarification of using Web Launcher Access with correct permission profile",
+      "product_version": "FortiPAM 1.6.x",
+      "accessed_at": "2026-08-21",
+      "locator": "https://community.fortinet.com/fortipam-52/technical-tip-clarification-of-using-web-launcher-access-with-correct-permission-profile-209579",
+      "boundary": "Staff technical-tip evidence for FortiPAM 1.6.x permission behavior; a diagnostic lead, not proof of 1.9.1 behavior or an authorization to change permissions."
+    },
+    {
+      "source_id": "community-ssms-launcher",
+      "evidence_class": "fortinet_community_troubleshooting_tip",
+      "title": "SSMS secret launcher connection-timeout troubleshooting",
+      "product_version": "FortiPAM; SSMS 19 and 20",
+      "accessed_at": "2026-08-21",
+      "locator": "https://community.fortinet.com/fortipam-52/troubleshooting-tip-error-connection-timeout-expired-unable-to-connect-to-server-secret-launcher-for-ssms-client-213676",
+      "boundary": "Staff troubleshooting evidence for client compatibility and setup; validate target, FortiPAM, and SSMS versions before applying it."
+    },
+    {
+      "source_id": "community-session-duration",
+      "evidence_class": "fortinet_community_technical_tip",
+      "title": "Secret sessions get disconnected every 2 hours",
+      "product_version": "FortiPAM",
+      "accessed_at": "2026-08-21",
+      "locator": "https://community.fortinet.com/fortipam-52/technical-tip-secret-sessions-get-disconnected-every-2-hours-227720",
+      "boundary": "Staff technical-tip evidence for default duration behavior; it does not establish a specific appliance setting or session event."
+    },
+    {
+      "source_id": "community-fortios-password-changer",
+      "evidence_class": "fortinet_community_technical_tip",
+      "title": "FortiPAM password changer for FortiOS 7.6.3 and above",
+      "product_version": "FortiOS 7.6.3+; FortiPAM",
+      "accessed_at": "2026-08-21",
+      "locator": "https://community.fortinet.com/fortipam-52/technical-tip-fortipam-password-changer-for-fortios-v7-6-3-and-above-228919",
+      "boundary": "Staff technical-tip evidence for a target-side prompt compatibility change; it is not permission to run a password operation."
+    },
+    {
+      "source_id": "community-fortianalyzer-parsing",
+      "evidence_class": "fortinet_community_technical_tip",
+      "title": "FortiPAM secret-related logs not parsed correctly by FortiAnalyzer",
+      "product_version": "FortiPAM 1.7/1.8; FortiAnalyzer 7.2.x/7.6.x",
+      "accessed_at": "2026-08-21",
+      "locator": "https://community.fortinet.com/fortipam-52/technical-tip-fortipam-secret-related-logs-not-parsed-correctly-by-fortianalyzer-225627",
+      "boundary": "Staff technical-tip compatibility evidence for named FortiPAM and FortiAnalyzer versions; do not infer 1.9.1 support or receiver health from it."
+    },
+    {
+      "source_id": "community-ha-ems-tag-sync",
+      "evidence_class": "fortinet_community_troubleshooting_tip",
+      "title": "FortiPAM HA out-of-sync following FortiClient EMS ZTNA tag updates",
+      "product_version": "FortiPAM before 1.9.0; fixed in 1.9.0",
+      "accessed_at": "2026-08-22",
+      "locator": "https://community.fortinet.com/fortipam-52/troubleshooting-tip-fortipam-ha-status-goes-out-of-sync-because-of-the-zero-trust-network-access-ztna-tag-push-from-forticlient-ems-to-fortipam-227804",
+      "boundary": "Staff troubleshooting lead for Bug 1263843; a matching symptom is not proof of this root cause and does not authorize tag inspection or forced synchronization."
+    },
+    {
+      "source_id": "community-active-session-monitoring",
+      "evidence_class": "fortinet_community_technical_tip",
+      "title": "FortiPAM Active Session Monitoring visibility and expected video delay",
+      "product_version": "FortiPAM 1.8/1.9",
+      "accessed_at": "2026-08-22",
+      "locator": "https://community.fortinet.com/fortipam-52/technical-tip-active-session-video-monitoring-not-showing-in-real-time-228817",
+      "boundary": "Staff guidance for role-level visibility and typical buffering; not an SLA, session-data authority, or permission to inspect recordings."
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "platform-health",
+      "title": "Establish FortiPAM platform and API health",
+      "domain": "platform",
+      "risk_class": "low",
+      "intent": "Separate local configuration, TLS transport, appliance response, firmware drift, and configuration-shape evidence before deeper diagnosis.",
+      "documented_versions": ["1.9.0", "1.9.1"],
+      "version_notes": "The packaged API catalog is 1.9.0 while bounded compatibility checks cover 1.9.1; fixed-read success does not prove full API compatibility.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "pp. 76-85 and system information guidance"},
+        {"source_id": "fortipam-1-9-0-api-catalog", "detail": "GET system status, system global, and license-status candidates"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "bounded system-status, system-global, and minimized license/support posture checks"}
+      ],
+      "symptoms": ["FortiPAM API is unreachable", "MCP health succeeds but live reads fail", "documented and observed versions differ"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "local-runtime", "check": "Confirm required settings are present without displaying values.", "evidence": "Configuration-presence flags and strict TLS state.", "tool": "fortipam_configuration_status"},
+        {"order": 2, "layer": "catalog", "check": "Confirm API catalog version, coverage, and freshness.", "evidence": "Catalog status with unavailable-page boundary.", "tool": "get_api_catalog_status"},
+        {"order": 3, "layer": "overall-health", "check": "Run the fixed seven-route aggregate health read.", "evidence": "Evidence completeness and bounded risk signals without raw component results or error details.", "tool": "get_overall_health_summary"},
+        {"order": 4, "layer": "transport", "check": "Run the fixed system-status structural read when component detail is needed.", "evidence": "HTTP status, JSON content type, and structural summary only.", "tool": "get_system_status_summary"},
+        {"order": 5, "layer": "configuration-shape", "check": "Run the fixed system-global structural read.", "evidence": "Sanitized key and collection shape without configuration values.", "tool": "get_system_global_summary"},
+        {"order": 6, "layer": "license-support", "check": "Check subscription, capacity, support, VM license, and FortiGuard health bands.", "evidence": "Health and expiry bands without account, company, exact date, licensed count, or server value.", "tool": "get_license_support_posture_summary"}
+      ],
+      "available_tools": ["fortipam_configuration_status", "get_api_catalog_status", "get_overall_health_summary", "get_system_status_summary", "get_system_global_summary", "get_license_support_posture_summary"],
+      "candidate_tools": [],
+      "blocked_actions": ["Disable TLS verification", "Probe arbitrary REST paths", "Return raw system or license payloads"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "current-tools-validated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "api-contract-compatibility",
+      "title": "Assess a FortiPAM API contract across 1.9.0 and 1.9.1",
+      "domain": "api-integration",
+      "risk_class": "moderate",
+      "intent": "Determine whether an operation is documented, safely classifiable, and separately accepted on the observed appliance version without treating catalog membership as execution authority.",
+      "documented_versions": ["1.9.0", "1.9.1"],
+      "version_notes": "The FNDN UI capture is 1.9.0 metadata. The 1.9.1 Administration Guide documents behavior but is not an OpenAPI contract.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-0-api-catalog", "detail": "1,295 operations across 88 of 91 resource pages"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "current product behavior and role model"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "three named fixed-read routes checked only"}
+      ],
+      "symptoms": ["An integration needs an undocumented endpoint", "A 1.9.0 operation is assumed to work on 1.9.1", "A catalog search result is mistaken for a callable tool"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "discovery", "check": "Search the offline catalog by product concept and method.", "evidence": "Bounded operation summaries with risk and eligibility.", "tool": "search_api_catalog"},
+        {"order": 2, "layer": "classification", "check": "Classify the exact documented method and templated path.", "evidence": "Parameters, response codes, risk class, and live_call_permitted=false.", "tool": "classify_api_operation"},
+        {"order": 3, "layer": "product-source", "check": "Map the scenario to the 1.9.1 Administration Guide or Release Notes.", "evidence": "Versioned product behavior and known delta.", "tool": null},
+        {"order": 4, "layer": "acceptance", "check": "Require a named tool, projected output schema, denial tests, and separate lab evidence.", "evidence": "Tool-specific acceptance rather than a direct probe alone.", "tool": null}
+      ],
+      "available_tools": ["get_api_catalog_status", "search_api_catalog", "classify_api_operation", "plan_curated_reads"],
+      "candidate_tools": [],
+      "blocked_actions": ["Dispatch a catalog operation", "Infer an instance path from a template", "Claim complete 1.9.1 schema equivalence"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "current-tools-validated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "api-user-least-privilege",
+      "title": "Verify API-user least privilege without exposing the token",
+      "domain": "identity-governance",
+      "risk_class": "high",
+      "intent": "Establish which read permissions the dedicated API identity requires and prevent a broad token from silently expanding MCP authority.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "A fixed 1.9.1 lab audit found a custom profile with nine write-capable permission categories, one disabled category, and a trust-host restriction. The identity is dedicated but not least privilege; no identity, profile, category, or credential values were retained.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "User management, API user, role, and access-control sections pp. 326-365"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "bounded API-user and access-profile checks exercised least-privilege classification without retaining protected values"}
+      ],
+      "symptoms": ["The API token can read more than the MCP needs", "Authentication succeeds but role scope is unknown", "A new read tool needs permission evidence"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "identity", "check": "Confirm a dedicated API user is used without returning its name or token.", "evidence": "Presence and identity-class confirmation only.", "tool": "fortipam_configuration_status"},
+        {"order": 2, "layer": "role", "check": "Run the fixed operator permission audit against the API-user and access-profile objects.", "evidence": "Derived permission-level counts and trust-host posture, not identities, category names, or secrets.", "tool": null},
+        {"order": 3, "layer": "negative-test", "check": "Verify denied access to an unneeded sensitive read.", "evidence": "Sanitized authorization-denied result.", "tool": null},
+        {"order": 4, "layer": "mapping", "check": "Map each live tool to its minimum required permission.", "evidence": "Versioned tool-to-permission matrix.", "tool": null}
+      ],
+      "available_tools": ["fortipam_configuration_status", "plan_curated_reads"],
+      "candidate_tools": ["get_api_user_access_profile_summary"],
+      "blocked_actions": ["Return API-user names or tokens", "List unrestricted user configuration", "Regenerate a key"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "validated-risk-found", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "approval-request-blocked",
+      "title": "Diagnose an approved or pending request that cannot launch",
+      "domain": "approval",
+      "risk_class": "high",
+      "intent": "Separate approval state from checkout, access authentication, ZTNA, launcher, network, and target-authentication gates.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "FortiPAM supports up to three approval tiers; a denial at any tier stops progression, and approval alone does not satisfy other launch gates.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Approval flow and approval profile pp. 254-258; secret launch pp. 136-157"},
+        {"source_id": "fortipam-derived-notes", "detail": "Secrets Management evidence ladder scenario seed"}
+      ],
+      "symptoms": ["Request is approved but launch remains unavailable", "Request remains pending", "Launch fails after approval"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "approval-profile", "check": "Confirm the approval-profile response shape is reachable.", "evidence": "Profile collection structure only, without approver or policy values.", "tool": "get_approval_profile_summary"},
+        {"order": 2, "layer": "request-state", "check": "Check submitted, approved, denied, revoked, expired, and available time-window state.", "evidence": "Minimized state counts or one authorized request state.", "tool": null},
+        {"order": 3, "layer": "temporary-gates", "check": "Check checkout owner, access-authentication duration, ZTNA posture, and concurrency independently.", "evidence": "First failing gate with timestamp.", "tool": null},
+        {"order": 4, "layer": "launch-path", "check": "Check launcher/client, proxy/gateway/network, and target authentication.", "evidence": "Correlated FortiPAM and target-side outcome without credential disclosure.", "tool": null}
+      ],
+      "available_tools": ["get_approval_profile_summary"],
+      "candidate_tools": ["get_request_state_summary", "get_proxy_session_count_summary"],
+      "blocked_actions": ["Approve or revoke a request", "Check out or check in a secret", "Launch a session", "Return approver identities"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "self-approval-control",
+      "title": "Assess the FortiPAM 1.9.1 self-approval control",
+      "domain": "approval",
+      "risk_class": "high",
+      "intent": "Identify single-tier approval profiles that could allow requestors to approve their own access and distinguish policy posture from an actual request event.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "Self Approval is new in 1.9.1, applies only to one-tier profiles, and defaults to Block according to the official guide.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "What's new p. 12 and approval profile pp. 255-258"},
+        {"source_id": "fortipam-1-9-1-release", "detail": "What's new and resolved issue 1307624"}
+      ],
+      "symptoms": ["A requestor approved their own access", "Self Approval posture is unknown after upgrade", "A one-tier profile needs segregation-of-duties review"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "version", "check": "Confirm the appliance is 1.9.1 or later before evaluating the setting.", "evidence": "Sanitized firmware version evidence.", "tool": "get_system_status_summary"},
+        {"order": 2, "layer": "profile-scope", "check": "Identify one-tier approval profiles without returning names or approvers.", "evidence": "Count of in-scope profiles.", "tool": null},
+        {"order": 3, "layer": "control-posture", "check": "Project only tier count and Self Approval allow/block state.", "evidence": "Aggregate posture with no policy identities.", "tool": null},
+        {"order": 4, "layer": "event-correlation", "check": "Correlate a requestor and approver only inside an authorized audit workflow.", "evidence": "Violation count and evidence reference, not raw identities.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary", "get_approval_profile_summary"],
+      "candidate_tools": ["get_self_approval_posture_summary"],
+      "blocked_actions": ["Change approval profiles", "Return approver or requestor identities", "Approve a request"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "secret-launch-failure",
+      "title": "Localize a secret-launch failure to the first failing gate",
+      "domain": "secret-session",
+      "risk_class": "high",
+      "intent": "Diagnose identity, permission, policy, approval, checkout, access authentication, ZTNA, launcher, gateway, target, and recording layers in order.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "Launcher behavior depends on web/native mode, FortiClient version, proxy path, target protocol, and 1.9.x feature-specific limitations.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Creating and launching secrets pp. 91-157; launchers pp. 221-238; troubleshooting pp. 561-580"},
+        {"source_id": "fortipam-derived-notes", "detail": "Secrets Management troubleshooting and evidence ladder"}
+      ],
+      "symptoms": ["Unable to launch secret", "Launcher icon is missing", "Native client starts but target connection fails", "Web launcher closes immediately"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "authorization", "check": "Confirm login, role, resource permission, and effective policy before network diagnosis.", "evidence": "First denied control layer.", "tool": null},
+        {"order": 2, "layer": "temporary-gates", "check": "Evaluate approval, checkout, access authentication, ZTNA, and concurrent limits separately.", "evidence": "Gate state and expiry timestamp.", "tool": null},
+        {"order": 3, "layer": "client-path", "check": "Validate template, launcher, deployment mode, FortiClient process, proxy, and gateway path.", "evidence": "Selected path and component health without parameters that contain credentials.", "tool": null},
+        {"order": 4, "layer": "target-and-evidence", "check": "Correlate target reachability/authentication and post-session logs.", "evidence": "Target-side outcome plus FortiPAM event reference.", "tool": null}
+      ],
+      "available_tools": ["search_api_catalog", "classify_api_operation"],
+      "candidate_tools": ["get_proxy_session_count_summary", "get_launcher_health_summary"],
+      "blocked_actions": ["Retrieve a credential", "Launch or disconnect a session", "Disable ZTNA or recording", "Run unbounded debug"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "agentless-recording-disconnect",
+      "title": "Diagnose agentless recording disconnects with a 1.9.1 version gate",
+      "domain": "session-recording",
+      "risk_class": "high",
+      "intent": "Distinguish a fixed 1.9.0 defect from current client, browser, recording, storage, and target-path failures.",
+      "documented_versions": ["1.9.0", "1.9.1"],
+      "version_notes": "Release Notes list issue 1277720 as resolved in 1.9.1: an Agentless launch could disconnect when Video Recording was enabled.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-release", "detail": "Resolved issue 1277720"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Active sessions and live recording pp. 395-398; video storage pp. 540-556; troubleshooting pp. 561-571"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "Fixed current-disk-usage projection checked without capacities, timestamps, identities, or recordings"}
+      ],
+      "symptoms": ["Agentless session disconnects when recording is enabled", "Recording is missing", "WebRDP opens and closes"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "version", "check": "Confirm whether the appliance is before or after the 1.9.1 fix.", "evidence": "Firmware version and build without serial or hostname.", "tool": "get_system_status_summary"},
+        {"order": 2, "layer": "mode", "check": "Confirm agentless, extension, or FortiClient launch mode and browser support.", "evidence": "Selected mode and supported-client version.", "tool": null},
+        {"order": 3, "layer": "recording-path", "check": "Check recording storage capacity and whether recording history exists before investigating launch or upload state.", "evidence": "Video/log usage bands and recording-history presence without byte counts, timestamps, identities, or video content.", "tool": "get_recording_storage_health_summary"},
+        {"order": 4, "layer": "reproduction", "check": "Use a bounded lab A-B-A test only if the first three layers are inconclusive.", "evidence": "Positive, negative, and recovery timestamps with no recording download.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary", "get_recording_storage_health_summary"],
+      "candidate_tools": ["get_proxy_session_count_summary"],
+      "blocked_actions": ["Download a recording", "Disconnect a session", "Enable verbose trace without a stop plan", "Expose session identities"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "storage-tool-validated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "secret-gateway-path",
+      "title": "Diagnose Secret Gateway control and target reachability",
+      "domain": "secret-gateway",
+      "risk_class": "high",
+      "intent": "Separate FortiPAM-to-gateway control connectivity, gateway chaining, mTLS identity, gateway-to-target reachability, and session evidence.",
+      "documented_versions": ["1.9.0", "1.9.1"],
+      "version_notes": "Gateway chaining was introduced in 1.9.0; only the terminal gateway requires direct target reachability and inter-gateway communication uses mTLS.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "FortiPAM server and Secret Gateway pp. 466-481"},
+        {"source_id": "fortipam-1-9-0-api-catalog", "detail": "secret gateway CMDB and internal-info operations are classified high risk"},
+        {"source_id": "fortipam-derived-notes", "detail": "Secret Gateway evidence ladder and deployment model"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "No-parameter gateway collection was incompatible and was not promoted"}
+      ],
+      "symptoms": ["Gateway appears connected but target launch times out", "Gateway chain does not advertise", "mTLS or gateway identity fails"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "deployment-model", "check": "Identify direct, forward, reverse, service, or chained gateway mode.", "evidence": "Mode and component count without private topology.", "tool": null},
+        {"order": 2, "layer": "control-plane", "check": "Check gateway connection, certificate state, and root/terminal role.", "evidence": "Aggregate posture without gateway names, serials, or certificates.", "tool": null},
+        {"order": 3, "layer": "target-path", "check": "Validate DNS, route, port, and target reachability from the terminal gateway.", "evidence": "Pass/fail per approved target class, not addresses.", "tool": null},
+        {"order": 4, "layer": "session", "check": "Correlate launch and target authentication after the path is healthy.", "evidence": "Session count and state without user, secret, or target values.", "tool": null}
+      ],
+      "available_tools": ["search_api_catalog", "classify_api_operation"],
+      "candidate_tools": ["get_secret_gateway_posture_summary"],
+      "blocked_actions": ["Return gateway names or private topology", "Modify gateway configuration", "Run generic gateway CLI", "Launch a session"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "ztna-access-denial",
+      "title": "Explain a ZTNA-based FortiPAM or secret-access denial",
+      "domain": "ztna",
+      "risk_class": "high",
+      "intent": "Correlate FortiPAM policy, endpoint certificate, EMS tag state, FortiGate access path, and secret-level enforcement without inheriting cross-product authority.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "FortiPAM access-level and secret-level ZTNA controls depend on current endpoint context; FortiGate and EMS evidence remains separately owned.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "ZTNA tags and access control pp. 496-503; EMS connector pp. 458-460"},
+        {"source_id": "fortipam-derived-notes", "detail": "ZTNA A-B-A lab and evidence ladder"}
+      ],
+      "symptoms": ["User can log in but cannot access a secret", "Endpoint tag is stale", "FortiGate ZTNA path works for another endpoint"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "ems-connection", "check": "Observe aggregate FortiPAM-side EMS connection and certificate posture without connector values.", "evidence": "Connector count band, aggregate states, and explicit unobserved layers.", "tool": "get_ems_connection_posture_summary"},
+        {"order": 2, "layer": "policy", "check": "Identify whether denial is FortiPAM-access or secret-level ZTNA enforcement.", "evidence": "Control layer and policy-reference class, not policy values.", "tool": null},
+        {"order": 3, "layer": "endpoint", "check": "Check endpoint certificate and EMS tag/tag-group state through the owning systems.", "evidence": "Expected-versus-observed posture labels.", "tool": null},
+        {"order": 4, "layer": "network", "check": "Correlate the separately authorized FortiGate path if it participates.", "evidence": "Policy outcome and timestamp from the owning system.", "tool": null},
+        {"order": 5, "layer": "a-b-a", "check": "Use a controlled posture change only in an approved lab workflow.", "evidence": "Allowed, denied, and restored outcomes.", "tool": null}
+      ],
+      "available_tools": ["get_ems_connection_posture_summary", "search_api_catalog", "classify_api_operation"],
+      "candidate_tools": [],
+      "blocked_actions": ["Change EMS tags", "Modify FortiGate policy", "Disable ZTNA", "Return endpoint identities"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "ems-projection-and-v17-runtime-validated", "last_reviewed": "2026-08-22"}
+    },
+    {
+      "scenario_id": "identity-provisioning-role",
+      "title": "Diagnose authentication, provisioning, role, and resource-scope mismatch",
+      "domain": "identity-governance",
+      "risk_class": "high",
+      "intent": "Separate source authentication, user provisioning, role assignment, group membership, and secret permission when login or authorization differs from expectation.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "The current guide covers local, remote, API, JWT, auto-provision, SCIM, sponsored group, and role controls; each is a separate evidence layer.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "User management pp. 326-393"},
+        {"source_id": "fortipam-derived-notes", "detail": "Users and Roles troubleshooting evidence ladder"}
+      ],
+      "symptoms": ["Remote authentication succeeds but the user has the wrong role", "User can log in but sees no secrets", "SCIM or auto-provision changes terminate access"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "authentication", "check": "Confirm the source identity system accepted the authentication event.", "evidence": "Protocol result and timestamp without credential material.", "tool": null},
+        {"order": 2, "layer": "provisioning", "check": "Check static, auto-provision, wildcard, or SCIM user state and rule order.", "evidence": "Matched mechanism and state, not user attributes.", "tool": null},
+        {"order": 3, "layer": "role-group", "check": "Compare expected and effective role/group classes.", "evidence": "Permission class delta without names or membership export.", "tool": null},
+        {"order": 4, "layer": "resource", "check": "Check folder and secret effective permission after role is correct.", "evidence": "Resource-scope result without secret names.", "tool": null}
+      ],
+      "available_tools": ["search_api_catalog", "classify_api_operation"],
+      "candidate_tools": ["get_identity_posture_summary"],
+      "blocked_actions": ["Return user lists or group membership", "Change roles or groups", "Deauthenticate users", "Expose SAML, LDAP, JWT, or SCIM secrets"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "fortianalyzer-delivery",
+      "title": "Diagnose FortiPAM-to-FortiAnalyzer log delivery",
+      "domain": "logging",
+      "risk_class": "moderate",
+      "intent": "Separate FortiPAM connector configuration, certificate verification, authorization, upload scheduling, and FortiAnalyzer ingestion.",
+      "documented_versions": ["1.9.1"],
+      "version_notes": "FortiPAM can send logs to FortiAnalyzer and optionally allow FortiAnalyzer REST API access; connection, authorization, and delivery are distinct states. The fixed configuration route and its non-identifying posture tool were validated on the 1.9.1 development lab.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-admin", "detail": "FortiAnalyzer logging pp. 460-462 and log source selection pp. 399-401"},
+        {"source_id": "fortipam-1-9-0-api-catalog", "detail": "log.fortianalyzer setting and monitor license status candidates"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "configuration route supported the safe projection contract without retaining values"}
+      ],
+      "symptoms": ["Connector is configured but no logs arrive", "FortiAnalyzer shows unauthorized", "Certificate verification fails", "FortiAnalyzer is unavailable as a log source"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "configuration", "check": "Project enabled state, upload mode, REST-access setting, and certificate-verification state only.", "evidence": "Boolean and enum posture without server address or serial.", "tool": "get_fortianalyzer_delivery_posture_summary"},
+        {"order": 2, "layer": "connectivity", "check": "Check FortiPAM-side connectivity and authorization state.", "evidence": "Sanitized status and last transition time.", "tool": null},
+        {"order": 3, "layer": "delivery", "check": "Generate or identify a deterministic non-sensitive event and check upload progression.", "evidence": "Event class and timestamps, not raw logs.", "tool": null},
+        {"order": 4, "layer": "receiver", "check": "Confirm ingestion on FortiAnalyzer through its owning tool or project.", "evidence": "Device authorization and matching event timestamp.", "tool": null}
+      ],
+      "available_tools": ["search_api_catalog", "classify_api_operation", "get_fortianalyzer_delivery_posture_summary"],
+      "candidate_tools": [],
+      "blocked_actions": ["Return FortiAnalyzer address or serial", "Export raw logs", "Authorize a connector", "Modify remote logging settings"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "current-tool-validated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "ha-sync",
+      "title": "Diagnose FortiPAM HA members that are online but out of sync",
+      "domain": "resilience",
+      "risk_class": "high",
+      "intent": "Distinguish cluster role and reachability from configuration-table checksum consistency while keeping serials and configuration content private.",
+      "documented_versions": ["1.9.0", "1.9.1"],
+      "version_notes": "1.9.1 resolved issue 1291206 involving a fresh secondary with gui-access-role. Bug 1263843 linked EMS ZTNA Tag updates to repeated HA drift and was documented as fixed in 1.9.0; matching timing is only a version-scoped lead.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-release", "detail": "Resolved issue 1291206"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "HA pp. 504-512 and checksum troubleshooting pp. 581-583"},
+        {"source_id": "fortipam-1-9-0-api-catalog", "detail": "system HA configuration and HA checksum monitor candidates"},
+        {"source_id": "community-ha-ems-tag-sync", "detail": "Bug 1263843 timing and fixed-version troubleshooting lead"}
+      ],
+      "symptoms": ["HA members are online but configuration is out of sync", "A fresh secondary fails to synchronize", "Checksums differ after upgrade", "HA state fluctuates after EMS ZTNA Tag updates"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "configuration-gate", "check": "Establish whether HA is enabled and review its non-identifying topology and security posture.", "evidence": "Normalized mode, heartbeat controls, configured-interface presence, and peer-entry counts without values.", "tool": "get_ha_configuration_posture_summary"},
+        {"order": 2, "layer": "version-role", "check": "If HA is enabled, confirm firmware/build parity, peer state, and primary/secondary role without serial values.", "evidence": "Version parity, role counts, and aggregate peer health through a future fixed sync tool.", "tool": null},
+        {"order": 3, "layer": "checksums", "check": "Compare global and root checksum equality without returning hashes.", "evidence": "Per-scope match booleans and mismatch table count.", "tool": null},
+        {"order": 4, "layer": "ems-correlation", "check": "When drift follows EMS updates, compare only aggregate EMS connection posture and the fixed HA API/CLI relationship; do not read tag objects.", "evidence": "Version, timing hypothesis, connector posture, and bounded relationship class without tag or peer fields.", "tool": "correlate_ha_api_cli_posture"},
+        {"order": 5, "layer": "bounded-detail", "check": "If mismatched, identify table classes only through an approved human diagnostic workflow.", "evidence": "Affected table classes without configuration rows.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary", "search_api_catalog", "classify_api_operation", "get_ha_configuration_posture_summary", "get_ems_connection_posture_summary", "get_cli_ha_configuration_summary", "get_cli_ha_status_summary", "get_cli_ha_checksum_summary", "correlate_ha_api_cli_posture"],
+      "candidate_tools": ["get_ha_ems_sync_posture_summary"],
+      "blocked_actions": ["Force synchronization", "Disconnect a peer", "Reboot a member", "Return serials, hashes, or configuration tables"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "fixed-ha-tools-validated-ems-causality-unvalidated", "last_reviewed": "2026-08-22"}
+    },
+    {
+      "scenario_id": "password-lifecycle-failure",
+      "title": "Diagnose password verification or rotation failure without handling credentials",
+      "domain": "credential-lifecycle",
+      "risk_class": "high",
+      "intent": "Classify changer, network, target authentication, target policy, generated-password policy, and dependency failures while keeping all password actions outside MCP.",
+      "documented_versions": ["1.9.0", "1.9.1"],
+      "version_notes": "1.9.1 resolved Azure AD Web API changer issue 1273260. The fixed configuration tool can establish changer-definition availability only; target assignment, compatibility, and job health still require separate evidence.",
+      "source_refs": [
+        {"source_id": "fortipam-1-9-1-release", "detail": "Resolved issue 1273260"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Password changers pp. 273-292 and troubleshooting pp. 574-578"},
+        {"source_id": "fortipam-derived-notes", "detail": "Secrets lifecycle evidence ladder"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "Fixed Password Changer collection projection checked without names, procedures, authentication modes, references, origins, or credentials"}
+      ],
+      "symptoms": ["Password verification fails", "Password change fails", "Target rejects the generated password", "A dependency remains stale after rotation"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "changer-inventory", "check": "Check whether Password Changer definitions exist without reading their names or procedures.", "evidence": "Inventory and count bands plus a documented FortiOS 7.6.3+ label-match signal; a match does not prove a vendor default, unchanged procedure, target assignment, compatibility, or job health.", "tool": "get_password_changer_configuration_posture_summary"},
+        {"order": 2, "layer": "version-template", "check": "Confirm target type, template, assigned changer class, and relevant product versions through separately authorized evidence.", "evidence": "Compatibility tuple without account or target identity.", "tool": null},
+        {"order": 3, "layer": "network", "check": "Check approved protocol reachability from FortiPAM to the target.", "evidence": "Protocol reachability result without addresses.", "tool": null},
+        {"order": 4, "layer": "target-policy", "check": "Compare target password age, complexity, remote restrictions, and account state with FortiPAM policy.", "evidence": "Policy mismatch categories, never password values.", "tool": null},
+        {"order": 5, "layer": "lifecycle", "check": "Correlate changer result, verification, reconciliation, and dependency outcome.", "evidence": "Sanitized job states and timestamps.", "tool": null}
+      ],
+      "available_tools": ["search_api_catalog", "classify_api_operation", "get_password_changer_configuration_posture_summary"],
+      "candidate_tools": ["get_password_job_failure_summary"],
+      "blocked_actions": ["Verify or change a password", "Retrieve a secret", "Check out or check in a secret", "Return changer logs containing credentials"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "changer-configuration-tool-validated", "last_reviewed": "2026-08-22"}
+    },
+    {
+      "scenario_id": "web-launcher-permission-mismatch",
+      "title": "Diagnose a Web Launcher permission and access-mode mismatch",
+      "domain": "secret-session",
+      "risk_class": "high",
+      "intent": "Separate Web Launcher Access mode, effective secret permission, target/proxy prerequisite, and browser-path readiness before treating a greyed launcher as a credential or network failure.",
+      "documented_versions": ["1.6.x", "1.9.1"],
+      "version_notes": "A Fortinet Community staff tip documents 1.6.x behavior: View permission works with Web Launcher Access Any, while Restricted requires Edit or Owner. It is a version-scoped diagnostic lead and has not been validated on this 1.9.1 lab.",
+      "source_refs": [
+        {"source_id": "community-web-launcher-permission", "detail": "Web Launcher Access Any/Restricted and View/Edit/Owner compatibility guidance"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Launchers, web proxy, secret permissions, and troubleshooting sections"}
+      ],
+      "symptoms": ["Web Launcher is greyed out", "View-only user cannot launch a web secret", "Clear-text permission error appears during web launch"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "version-and-mode", "check": "Record FortiPAM version and whether the secret uses a Web Launcher path before applying the 1.6.x compatibility lead.", "evidence": "Version boundary and launch-mode classification without secret identity.", "tool": "get_system_status_summary"},
+        {"order": 2, "layer": "effective-permission", "check": "Compare effective View/Edit/Owner class with the configured Web Launcher Access mode in an authorized administrative review.", "evidence": "Permission/mode compatibility result without users, roles, or secret names.", "tool": null},
+        {"order": 3, "layer": "target-proxy", "check": "Confirm that the required target and web-proxy prerequisites are present for the chosen launch model.", "evidence": "Prerequisite state without addresses, proxy values, or target identity.", "tool": null},
+        {"order": 4, "layer": "browser-path", "check": "Validate browser extension and supported browser readiness only after the policy combination is compatible.", "evidence": "Client readiness outcome without browser logs or tokens.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary"],
+      "candidate_tools": ["get_web_launcher_permission_posture_summary"],
+      "blocked_actions": ["Change Web Launcher Access", "Grant Edit or Owner permission", "Retrieve a credential", "Launch a session", "Expose user, role, target, or secret identities"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "ssms-launcher-compatibility",
+      "title": "Diagnose SSMS launcher compatibility and local-client preparation",
+      "domain": "secret-session",
+      "risk_class": "high",
+      "intent": "Classify an SSMS launcher failure as unsupported client version, unsupported custom launcher, stale local settings, authentication-mode mismatch, or a later target-path failure without collecting credentials or client files.",
+      "documented_versions": ["SSMS 19", "SSMS 20", "1.9.1"],
+      "version_notes": "A Fortinet Community staff troubleshooting tip identifies SSMS 19 and 20 as supported and notes that custom launchers and Windows Authentication are not supported for its covered FortiPAM launch flow. This has not been lab-validated here.",
+      "source_refs": [
+        {"source_id": "community-ssms-launcher", "detail": "Supported SSMS versions, custom-launcher boundary, local settings, and SQL Server Authentication guidance"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Native launcher and troubleshooting guidance"}
+      ],
+      "symptoms": ["SSMS launcher reports connection timeout", "SSMS launcher cannot connect to server", "A custom SSMS launcher is selected", "Windows Authentication is selected for an SSMS secret"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "launch-classification", "check": "Confirm that the reported issue is an SSMS native-launcher path rather than a Web Launcher or target database outage.", "evidence": "Launcher and target-protocol class without secret or target identity.", "tool": null},
+        {"order": 2, "layer": "client-compatibility", "check": "Check the installed SSMS major version and whether the standard launcher is used.", "evidence": "Supported/unsupported client classification without workstation details.", "tool": null},
+        {"order": 3, "layer": "local-preparation", "check": "Have the endpoint owner validate settings-file regeneration and the documented authentication mode without submitting files to MCP.", "evidence": "Endpoint-owner attestation and sanitized outcome.", "tool": null},
+        {"order": 4, "layer": "target-path", "check": "Only after client compatibility passes, correlate approved target reachability and database authentication outcome.", "evidence": "First downstream failure layer without connection strings or credentials.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary"],
+      "candidate_tools": ["get_launcher_compatibility_summary", "get_session_failure_summary"],
+      "blocked_actions": ["Read client settings files", "Change SQL logging or credential delegation", "Launch a session", "Return connection strings or credentials"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "expected-session-duration-limit",
+      "title": "Distinguish an expected session-duration limit from an unexpected disconnect",
+      "domain": "secret-session",
+      "risk_class": "moderate",
+      "intent": "Determine whether a repeatable session end near two hours is consistent with the global maximum launching duration before investigating recording, gateway, network, or target faults.",
+      "documented_versions": ["1.8", "1.9.1"],
+      "version_notes": "A Fortinet Community staff tip states that the default Max Launching Duration is 120 minutes and that the setting is global. It also notes that Max Launched Sessions can limit concurrent launches since 1.8. The actual setting and its behavior are unvalidated on this lab.",
+      "source_refs": [
+        {"source_id": "community-session-duration", "detail": "Default 120-minute duration and global setting guidance"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Secret-session launch, active-session, and troubleshooting guidance"}
+      ],
+      "symptoms": ["Secret sessions disconnect at approximately two hours", "Multiple launch types end at the same duration", "A session timeout is mistaken for a gateway failure"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "timing-pattern", "check": "Compare sanitized start/end timing against the expected duration band across more than one affected launch type.", "evidence": "Repeatable-duration classification without session identities or exact timestamps.", "tool": null},
+        {"order": 2, "layer": "global-posture", "check": "Review the global maximum launching duration and concurrent-launch posture in an authorized administrative review.", "evidence": "Configured/default/unknown band without exact values or configuration export.", "tool": null},
+        {"order": 3, "layer": "exception-path", "check": "If timing is not repeatable, return to client, recording, gateway, network, and target evidence ladders.", "evidence": "First non-duration failure layer.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary"],
+      "candidate_tools": ["get_session_duration_posture_summary", "get_session_failure_summary"],
+      "blocked_actions": ["Change maximum launching duration", "Terminate a session", "Return session identities or timestamps", "Disable recording or access controls"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "fortios-7-6-3-password-changer",
+      "title": "Assess FortiOS 7.6.3+ password-changer compatibility before a lifecycle action",
+      "domain": "credential-lifecycle",
+      "risk_class": "high",
+      "intent": "Detect the target-version and changer-procedure compatibility boundary caused by a FortiOS administrator password-prompt change before treating a password job failure as a general network or policy problem.",
+      "documented_versions": ["FortiOS 7.6.3+", "1.9.1"],
+      "version_notes": "A Fortinet Community staff tip identifies a FortiOS 7.6.3+ password-prompt change and directs administrators to a compatible FortiPAM password changer. This lab confirms only that a definition label matches one documented label; it does not prove default identity, immutability, target assignment, target compatibility, or password-job health.",
+      "source_refs": [
+        {"source_id": "community-fortios-password-changer", "detail": "FortiOS 7.6.3+ prompt-change compatibility lead"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Password changer configuration and troubleshooting sections"},
+        {"source_id": "fortipam-1-9-1-release", "detail": "Version-specific password-changer resolved issues"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "Fixed Password Changer configuration projection and identity-denial checks"}
+      ],
+      "symptoms": ["FortiOS password rotation fails after target upgrade", "Password changer no longer matches the administrator prompt", "Verification fails only for FortiOS 7.6.3 or later targets"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "definition-availability", "check": "Check whether any Password Changer definition label matches the documented FortiOS 7.6.3+ labels.", "evidence": "Label-observation signal without returning the label, procedure, authentication mode, reference, or origin values; a match is not proof of default identity or compatibility.", "tool": "get_password_changer_configuration_posture_summary"},
+        {"order": 2, "layer": "compatibility-tuple", "check": "Record the FortiPAM version, target FortiOS version band, target type, and assigned changer class without account or device identity.", "evidence": "Compatibility tuple and unknown fields only; definition presence is not target compatibility.", "tool": "get_system_status_summary"},
+        {"order": 3, "layer": "procedure-match", "check": "Compare the assigned changer procedure with the version-scoped compatibility guidance through a separately authorized administrative review.", "evidence": "Compatible/incompatible/needs-vendor-confirmation classification without procedure content.", "tool": null},
+        {"order": 4, "layer": "non-secret-failure", "check": "If compatible, classify the first failure as network, authentication policy, prompt handling, or dependency state using a separately authorized workflow.", "evidence": "Normalized failure category without job logs, usernames, or passwords.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary", "get_password_changer_configuration_posture_summary"],
+      "candidate_tools": ["get_password_job_failure_summary"],
+      "blocked_actions": ["Verify or change a password", "Read a password changer script", "Retrieve a secret", "Return target identity, username, prompt text, or job logs"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "changer-configuration-tool-validated-target-unvalidated", "last_reviewed": "2026-08-22"}
+    },
+    {
+      "scenario_id": "fortianalyzer-secret-log-parsing",
+      "title": "Distinguish FortiAnalyzer delivery from secret-log parsing compatibility",
+      "domain": "logging",
+      "risk_class": "moderate",
+      "intent": "Separate FortiPAM sender configuration and receiver ingestion from FortiAnalyzer version/platform support when secret-related events arrive but appear under an unexpected log category or are not displayed correctly.",
+      "documented_versions": ["FortiPAM 1.7", "FortiPAM 1.8", "FortiPAM 1.9.1", "FortiAnalyzer 7.2.x", "FortiAnalyzer 7.6.x"],
+      "version_notes": "A Fortinet Community staff tip documents parsing/display limits for FortiPAM 1.7/1.8 secret logs on named FortiAnalyzer versions. It is not evidence of FortiPAM 1.9.1 receiver compatibility and requires an owning FortiAnalyzer evidence path.",
+      "source_refs": [
+        {"source_id": "community-fortianalyzer-parsing", "detail": "Named FortiPAM/FortiAnalyzer parsing and display compatibility guidance"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "FortiAnalyzer logging and log-source guidance"},
+        {"source_id": "fortipam-1-9-1-compatibility", "detail": "FortiPAM sender-side minimized configuration projection only"}
+      ],
+      "symptoms": ["Secret-related logs arrive under a FortiGate category", "FortiAnalyzer receives logs but cannot display secret-file events", "FortiPAM sender is configured but parser support is unknown"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "sender-posture", "check": "Check only FortiPAM sender enablement, certificate-verification posture, and upload mode.", "evidence": "Minimized delivery/security posture without server address or credentials.", "tool": "get_fortianalyzer_delivery_posture_summary"},
+        {"order": 2, "layer": "receiver-version", "check": "Use the owning FortiAnalyzer workflow to record its version and supported-platform result for the affected FortiPAM model/version.", "evidence": "Supported/unsupported/unknown compatibility classification without raw CLI output.", "tool": null},
+        {"order": 3, "layer": "event-correlation", "check": "Correlate a non-sensitive event type by time window and expected log category.", "evidence": "Delivery-versus-parsing outcome without raw logs or event identities.", "tool": null},
+        {"order": 4, "layer": "version-gate", "check": "Escalate version-specific parsing/display behavior only when the exact FortiPAM and FortiAnalyzer pair falls within published scope.", "evidence": "Version-scoped remediation recommendation or vendor-support handoff.", "tool": null}
+      ],
+      "available_tools": ["get_fortianalyzer_delivery_posture_summary"],
+      "candidate_tools": ["get_fortianalyzer_compatibility_summary"],
+      "blocked_actions": ["Export raw logs", "Modify FortiAnalyzer authorization or parser settings", "Run FortiAnalyzer CLI through this MCP", "Return server, serial, event, or user identifiers"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "sender-tool-validated-receiver-unvalidated", "last_reviewed": "2026-08-21"}
+    },
+    {
+      "scenario_id": "active-session-monitoring-boundary",
+      "title": "Assess Active Session Monitoring visibility and expected delay without session disclosure",
+      "domain": "secret-session",
+      "risk_class": "high",
+      "intent": "Separate administrator-role visibility, launch mode, expected buffering, and abnormal monitoring failure without collecting a session, user, target, video, or recording identifier.",
+      "documented_versions": ["1.8.x", "1.9.x"],
+      "version_notes": "Fortinet Community staff guidance describes role-level visibility and typical 1.9.x buffering ranges. Those ranges are operational guidance, not a deterministic SLA or a live-session permission contract.",
+      "source_refs": [
+        {"source_id": "community-active-session-monitoring", "detail": "Role-level visibility and typical video-buffering guidance"},
+        {"source_id": "fortipam-1-9-1-admin", "detail": "Administrator roles, Active Sessions, monitoring, and recording controls"}
+      ],
+      "symptoms": ["A monitoring role can see more active sessions than expected", "Active Session video is delayed", "Live monitoring is mistaken for Secret-folder-scoped visibility"],
+      "evidence_ladder": [
+        {"order": 1, "layer": "role-design", "check": "Confirm whether the administrator role grants Active Session Monitoring and evaluate it as potentially global visibility.", "evidence": "Permission class and owner decision without administrator or session identities.", "tool": null},
+        {"order": 2, "layer": "mode-version", "check": "Classify the FortiPAM version and FortiClient or Agentless mode before evaluating delay.", "evidence": "Version and mode categories only.", "tool": "get_system_status_summary"},
+        {"order": 3, "layer": "bounded-timing", "check": "Compare an operator-observed coarse delay band with the version-scoped guidance without collecting video or exact timestamps.", "evidence": "Expected-band, abnormal-band, or not-assessed classification.", "tool": null},
+        {"order": 4, "layer": "human-handoff", "check": "If the pattern is abnormal, hand off client, network, session, and recording diagnostics to their authorized owners.", "evidence": "First unobserved owner boundary without raw logs or session metadata.", "tool": null}
+      ],
+      "available_tools": ["get_system_status_summary", "get_recording_storage_health_summary"],
+      "candidate_tools": [],
+      "blocked_actions": ["List or inspect active sessions", "Return session, user, target, or recording metadata", "Change an administrator role", "Download or inspect monitoring video"],
+      "validation": {"review_state": "maker-reviewed", "lab_state": "community-version-gated-unvalidated", "last_reviewed": "2026-08-22"}
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "personal",
+  "interface": {
+    "displayName": "Personal"
+  },
+  "plugins": [
+    {
+      "name": "fortipam-security-copilot",
+      "source": {
+        "source": "local",
+        "path": "./plugins/fortipam-security-copilot"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Security"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# Direct runtime dependency versions accepted with FortiPAM MCP Server 2.0.0.
+# Transitive dependencies remain resolver-managed for Python/platform compatibility.
+asyncssh==2.24.0
+httpx==0.28.1
+mcp==2.0.0
+PyJWT==2.13.0
+truststore==0.10.4
+uvicorn==0.52.4

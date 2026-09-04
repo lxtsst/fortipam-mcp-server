@@ -1,0 +1,97 @@
+[
+  {
+    "case_id": "platform-health-route",
+    "query": "platform API unreachable health",
+    "expected_scenario_id": "platform-health"
+  },
+  {
+    "case_id": "api-contract-route",
+    "query": "API contract compatibility 1.9.1",
+    "expected_scenario_id": "api-contract-compatibility"
+  },
+  {
+    "case_id": "api-user-route",
+    "query": "API user least privilege",
+    "expected_scenario_id": "api-user-least-privilege"
+  },
+  {
+    "case_id": "approval-request-route",
+    "query": "request approved launch unavailable",
+    "expected_scenario_id": "approval-request-blocked"
+  },
+  {
+    "case_id": "self-approval-route",
+    "query": "self approval one tier",
+    "expected_scenario_id": "self-approval-control"
+  },
+  {
+    "case_id": "secret-launch-route",
+    "query": "secret launcher target failure",
+    "expected_scenario_id": "secret-launch-failure"
+  },
+  {
+    "case_id": "recording-route",
+    "query": "agentless recording disconnect",
+    "expected_scenario_id": "agentless-recording-disconnect"
+  },
+  {
+    "case_id": "gateway-route",
+    "query": "gateway target reachability",
+    "expected_scenario_id": "secret-gateway-path"
+  },
+  {
+    "case_id": "ztna-route",
+    "query": "ZTNA-based FortiPAM",
+    "expected_scenario_id": "ztna-access-denial"
+  },
+  {
+    "case_id": "identity-route",
+    "query": "remote user wrong role",
+    "expected_scenario_id": "identity-provisioning-role"
+  },
+  {
+    "case_id": "fortianalyzer-route",
+    "query": "FortiAnalyzer logs arrive",
+    "expected_scenario_id": "fortianalyzer-delivery"
+  },
+  {
+    "case_id": "ha-route",
+    "query": "HA checksum out of sync",
+    "expected_scenario_id": "ha-sync"
+  },
+  {
+    "case_id": "password-route",
+    "query": "target rejects generated password",
+    "expected_scenario_id": "password-lifecycle-failure"
+  },
+  {
+    "case_id": "web-launcher-permission-route",
+    "query": "Web Launcher restricted view permission",
+    "expected_scenario_id": "web-launcher-permission-mismatch"
+  },
+  {
+    "case_id": "ssms-launcher-route",
+    "query": "SSMS launcher connection timeout",
+    "expected_scenario_id": "ssms-launcher-compatibility"
+  },
+  {
+    "case_id": "session-duration-route",
+    "query": "session disconnect two hours",
+    "expected_scenario_id": "expected-session-duration-limit"
+  },
+  {
+    "case_id": "fortios-changer-route",
+    "query": "FortiOS 7.6.3 password changer",
+    "expected_scenario_id": "fortios-7-6-3-password-changer"
+  },
+  {
+    "case_id": "fortianalyzer-parsing-route",
+    "query": "FortiAnalyzer secret logs parsing",
+    "expected_scenario_id": "fortianalyzer-secret-log-parsing"
+  },
+  {
+    "case_id": "active-session-monitoring-route",
+    "query": "Active Session Monitoring",
+    "expected_scenario_id": "active-session-monitoring-boundary"
+  }
+]
