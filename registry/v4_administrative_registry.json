@@ -236,6 +236,7 @@
         "ApprovalAndObserveScheme"
       ],
       "workflow_skill_refs": [
+        "fortipam-access-domain-onboarding",
         "fortipam-resource-onboarding",
         "fortipam-secret-onboarding",
         "fortipam-session-security-policy-design",
@@ -1742,24 +1743,34 @@
       "version": "1.0.0",
       "name": "access domain onboarding",
       "category": "access",
-      "purpose": "Design and validate the fortipam-access-domain-onboarding administrator workflow; no device mutation is authorized.",
+      "purpose": "Route and coordinate one access-domain or Linux SSH/SFTP onboarding workflow; Skill text grants no device mutation authority.",
       "blueprint_refs": [
-        "FPA-BP-004"
+        "FPA-BP-004",
+        "FPA-BP-005"
       ],
       "scheme_refs": [
         "AccessDomainScheme",
         "ApprovalAndObserveScheme",
         "IdentityLifecycleScheme",
-        "MonitoringAuditScheme"
+        "LauncherScheme",
+        "MonitoringAuditScheme",
+        "SecretOnboardingScheme",
+        "SessionSecurityScheme",
+        "TargetConnectivityScheme"
       ],
       "source_refs": [
         "FPA-SRC-ADMIN-191",
+        "FPA-SRC-EXAMPLES-190",
+        "FPA-SRC-HOL-FEAT-19",
         "FPA-SRC-HOL-FUND-19"
       ],
       "required_information": [
+        "environment",
         "scope",
         "owner",
-        "environment",
+        "access_subjects_and_permissions",
+        "ssh_or_sftp_protocol",
+        "target_template_and_launcher_relations",
         "approval_mode",
         "evidence_requirements"
       ],
@@ -3184,20 +3195,52 @@
       "status": "planned",
       "implementation_evidence": {
         "evidence_status": "contract_tested",
-        "evidence_kind": "fake_only_contract",
-        "profile_blueprint_refs": ["FPA-BP-004"],
+        "evidence_kind": "source_backed_projection_contract",
+        "profile_blueprint_refs": [
+          "FPA-BP-004"
+        ],
         "module_refs": [
           "scripts/v4_planning.py",
+          "scripts/build_v4_plan_runtime.py",
           "v4_planning/canonical.py",
           "v4_planning/models.py",
           "v4_planning/engine.py",
-          "v4_planning/__init__.py"
+          "v4_planning/store.py",
+          "v4_planning/persistence.py",
+          "v4_planning/workflow_service.py",
+          "v4_planning/mcp_facade.py",
+          "v4_planning/runtime_profile.py",
+          "v4_planning/__init__.py",
+          "src/fortipam_mcp/access_domain_projection_source.py",
+          "src/fortipam_mcp/v4_runtime_host.py"
         ],
-        "test_refs": ["tests/test_v4_planning.py"],
+        "test_refs": [
+          "tests/test_v4_planning.py",
+          "tests/test_v4_m3.py",
+          "tests/test_v4_persistence.py",
+          "tests/test_v4_plan_runtime.py",
+          "tests/test_access_domain_projection_source.py",
+          "tests/test_v4_runtime_host.py"
+        ],
         "dispatchable": false,
-        "runtime_packaged": false,
-        "mcp_exposed": false,
-        "device_access": false
+        "planner_runtime_packaged": true,
+        "planner_mcp_exposed": false,
+        "executor_runtime_packaged": false,
+        "executor_mcp_exposed": false,
+        "device_access": true,
+        "projection_profile": {
+          "contract_id": "fortipam-access-domain-folder-observation-v1",
+          "contract_version": "1.1.0",
+          "source_ref": "fortipam-191-access-domain-projection",
+          "object_classes": [
+            "PublicFolder",
+            "AccessGrant"
+          ],
+          "max_age_seconds": 300,
+          "read_only": true,
+          "raw_responses_returned": false,
+          "product_selectors_returned": false
+        }
       }
     },
     {
@@ -3326,8 +3369,8 @@
         "FPA-SRC-HOL-FEAT-19",
         "FPA-SRC-HOL-FUND-19"
       ],
-      "lifecycle": "catalogued",
-      "maturity": "catalogued",
+      "lifecycle": "contract_tested",
+      "maturity": "contract_tested",
       "c3_material_allowed": false,
       "required_sections": [
         "scope",
@@ -3413,7 +3456,56 @@
           "c3_values_included": false
         }
       },
-      "status": "design_only"
+      "status": "planned",
+      "implementation_evidence": {
+        "evidence_status": "contract_tested",
+        "evidence_kind": "source_backed_projection_contract",
+        "profile_blueprint_refs": [
+          "FPA-BP-008"
+        ],
+        "module_refs": [
+          "scripts/v4_planning.py",
+          "scripts/build_v4_plan_runtime.py",
+          "v4_planning/canonical.py",
+          "v4_planning/models.py",
+          "v4_planning/engine.py",
+          "v4_planning/store.py",
+          "v4_planning/persistence.py",
+          "v4_planning/workflow_service.py",
+          "v4_planning/mcp_facade.py",
+          "v4_planning/runtime_profile.py",
+          "v4_planning/__init__.py",
+          "src/fortipam_mcp/approval_and_observe_projection_source.py",
+          "src/fortipam_mcp/v4_runtime_host.py"
+        ],
+        "test_refs": [
+          "tests/test_v4_planning.py",
+          "tests/test_v4_m3.py",
+          "tests/test_v4_persistence.py",
+          "tests/test_v4_plan_runtime.py",
+          "tests/test_approval_and_observe_projection_source.py",
+          "tests/test_v4_runtime_host.py"
+        ],
+        "dispatchable": false,
+        "planner_runtime_packaged": true,
+        "planner_mcp_exposed": false,
+        "executor_runtime_packaged": false,
+        "executor_mcp_exposed": false,
+        "device_access": true,
+        "projection_profile": {
+          "contract_id": "approval-and-observe-state-v1",
+          "contract_version": "1.0.0",
+          "source_ref": "fortipam-191-approval-observe-projection",
+          "object_classes": [
+            "ApprovalProfileBinding",
+            "SecretApprovalBinding"
+          ],
+          "max_age_seconds": 300,
+          "read_only": true,
+          "raw_responses_returned": false,
+          "product_selectors_returned": false
+        }
+      }
     },
     {
       "id": "BulkOnboardingScheme",
@@ -3427,8 +3519,8 @@
         "FPA-SRC-ADMIN-191",
         "FPA-SRC-EXAMPLES-190"
       ],
-      "lifecycle": "catalogued",
-      "maturity": "catalogued",
+      "lifecycle": "contract_tested",
+      "maturity": "contract_tested",
       "c3_material_allowed": false,
       "required_sections": [
         "scope",
@@ -3514,7 +3606,57 @@
           "c3_values_included": false
         }
       },
-      "status": "design_only"
+      "status": "planned",
+      "implementation_evidence": {
+        "evidence_status": "contract_tested",
+        "evidence_kind": "source_backed_projection_contract",
+        "profile_blueprint_refs": [
+          "FPA-BP-014"
+        ],
+        "module_refs": [
+          "scripts/v4_planning.py",
+          "scripts/build_v4_plan_runtime.py",
+          "v4_planning/canonical.py",
+          "v4_planning/models.py",
+          "v4_planning/engine.py",
+          "v4_planning/store.py",
+          "v4_planning/persistence.py",
+          "v4_planning/workflow_service.py",
+          "v4_planning/mcp_facade.py",
+          "v4_planning/runtime_profile.py",
+          "v4_planning/__init__.py",
+          "src/fortipam_mcp/ad_discovery_projection_source.py"
+        ],
+        "test_refs": [
+          "tests/test_v4_planning.py",
+          "tests/test_v4_m3.py",
+          "tests/test_v4_persistence.py",
+          "tests/test_v4_plan_runtime.py",
+          "tests/test_ad_discovery_projection_source.py"
+        ],
+        "dispatchable": false,
+        "planner_runtime_packaged": true,
+        "planner_mcp_exposed": false,
+        "executor_runtime_packaged": false,
+        "executor_mcp_exposed": false,
+        "device_access": true,
+        "projection_profile": {
+          "contract_id": "fortipam-ad-discovery-source-observation-v1",
+          "contract_version": "1.0.0",
+          "source_ref": "fortipam-700-build29-ad-discovery-projection",
+          "object_classes": [
+            "FolderBinding",
+            "DomainTargetBinding",
+            "TemplateBinding",
+            "DomainSecretMetadata",
+            "DiscoverySourceMetadata"
+          ],
+          "max_age_seconds": 300,
+          "read_only": true,
+          "raw_responses_returned": false,
+          "product_selectors_returned": false
+        }
+      }
     },
     {
       "id": "CertificateTrustScheme",
@@ -3957,8 +4099,8 @@
         "FPA-SRC-HOL-FEAT-19",
         "FPA-SRC-HOL-FUND-19"
       ],
-      "lifecycle": "catalogued",
-      "maturity": "catalogued",
+      "lifecycle": "contract_tested",
+      "maturity": "contract_tested",
       "c3_material_allowed": false,
       "required_sections": [
         "scope",
@@ -4044,7 +4186,39 @@
           "c3_values_included": false
         }
       },
-      "status": "design_only"
+      "status": "planned",
+      "implementation_evidence": {
+        "evidence_status": "contract_tested",
+        "evidence_kind": "fake_only_contract",
+        "profile_blueprint_refs": [
+          "FPA-BP-015"
+        ],
+        "module_refs": [
+          "scripts/v4_planning.py",
+          "scripts/build_v4_plan_runtime.py",
+          "v4_planning/canonical.py",
+          "v4_planning/models.py",
+          "v4_planning/engine.py",
+          "v4_planning/store.py",
+          "v4_planning/persistence.py",
+          "v4_planning/workflow_service.py",
+          "v4_planning/mcp_facade.py",
+          "v4_planning/runtime_profile.py",
+          "v4_planning/__init__.py"
+        ],
+        "test_refs": [
+          "tests/test_v4_planning.py",
+          "tests/test_v4_m3.py",
+          "tests/test_v4_persistence.py",
+          "tests/test_v4_plan_runtime.py"
+        ],
+        "dispatchable": false,
+        "planner_runtime_packaged": true,
+        "planner_mcp_exposed": false,
+        "executor_runtime_packaged": false,
+        "executor_mcp_exposed": false,
+        "device_access": false
+      }
     },
     {
       "id": "IntegrationScheme",
@@ -4599,20 +4773,78 @@
       "status": "planned",
       "implementation_evidence": {
         "evidence_status": "contract_tested",
-        "evidence_kind": "fake_only_contract",
-        "profile_blueprint_refs": ["FPA-BP-005"],
+        "evidence_kind": "source_backed_projection_contract",
+        "profile_blueprint_refs": [
+          "FPA-BP-005",
+          "FPA-BP-006",
+          "FPA-BP-007"
+        ],
         "module_refs": [
           "scripts/v4_planning.py",
+          "scripts/build_v4_plan_runtime.py",
           "v4_planning/canonical.py",
           "v4_planning/models.py",
           "v4_planning/engine.py",
-          "v4_planning/__init__.py"
+          "v4_planning/store.py",
+          "v4_planning/persistence.py",
+          "v4_planning/workflow_service.py",
+          "v4_planning/mcp_facade.py",
+          "v4_planning/runtime_profile.py",
+          "v4_planning/__init__.py",
+          "src/fortipam_mcp/secret_onboarding_projection_source.py",
+          "src/fortipam_mcp/v4_runtime_host.py"
         ],
-        "test_refs": ["tests/test_v4_planning.py"],
+        "test_refs": [
+          "tests/test_v4_planning.py",
+          "tests/test_v4_m3.py",
+          "tests/test_v4_persistence.py",
+          "tests/test_v4_plan_runtime.py",
+          "tests/test_secret_onboarding_projection_source.py",
+          "tests/test_v4_runtime_host.py"
+        ],
         "dispatchable": false,
-        "runtime_packaged": false,
-        "mcp_exposed": false,
-        "device_access": false
+        "planner_runtime_packaged": true,
+        "planner_mcp_exposed": false,
+        "executor_runtime_packaged": false,
+        "executor_mcp_exposed": false,
+        "device_access": true,
+        "projection_profile": {
+          "contract_id": "fortipam-secret-onboarding-observation-v1",
+          "contract_version": "1.7.0",
+          "source_ref": "fortipam-191-secret-onboarding-projection",
+          "object_classes": [
+            "FolderBinding",
+            "Target",
+            "TemplateBinding",
+            "SecretMetadata",
+            "WebSecretMetadata",
+            "LauncherBinding",
+            "PolicyBinding",
+            "RdpEventFilterBinding"
+          ],
+          "max_age_seconds": 300,
+          "read_only": true,
+          "raw_responses_returned": false,
+          "product_selectors_returned": false,
+          "additional_contracts": [
+            {
+              "contract_id": "fortipam-secret-session-controls-observation-v1",
+              "contract_version": "1.1.0",
+              "source_ref": "fortipam-191-secret-session-controls-projection",
+              "object_classes": [
+                "SecretSessionControlsBinding"
+              ]
+            },
+            {
+              "contract_id": "fortipam-web-secret-service-observation-v1",
+              "contract_version": "1.0.0",
+              "source_ref": "fortipam-191-secret-onboarding-projection",
+              "object_classes": [
+                "WebSecretServiceBinding"
+              ]
+            }
+          ]
+        }
       }
     },
     {

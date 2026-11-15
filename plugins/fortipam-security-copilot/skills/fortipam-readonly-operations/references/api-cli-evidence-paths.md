@@ -1,4 +1,4 @@
-# V2 API and CLI Evidence Paths
+# Read-only API and CLI Evidence Paths
 
 Use this reference when a diagnostic needs evidence beyond the minimized MCP
 projection. It defines an evidence route, not additional access authority.
@@ -11,19 +11,18 @@ projection. It defines an evidence route, not additional access authority.
 | A documented API question or a missing MCP capability | Use `search_api_catalog` and `classify_api_operation`, then record a candidate and its promotion gates. | The 1.9.0 catalog is incomplete discovery metadata; it never authorizes a request. |
 | Evidence requires a direct API observation | An authorized operator follows the project operator runbook using an already-approved, fixed read-only `GET` route. | No raw REST request, path, header, query, or body is supplied through a Skill or MCP call. Capture only the sanitized acceptance outcome. |
 | Evidence requires FortiPAM CLI | An authorized operator follows a per-case runbook with a fixed, non-mutating `get` or `show` command. | Do not invent, parameterize, or execute a CLI command from a Skill. Keep output, identifiers, topology, secrets, and session data out of MCP. |
-| The proposed check configures, debugs, repairs, synchronizes, or forces state | Stop at diagnosis and hand off to the human operator runbook. | `config`, `execute`, forced synchronization, service restart, password work, session control, all writes, and every `diagnose` command except the compiled read-only V2 HA checksum workflow are outside this plugin. |
+| The proposed check configures, debugs, repairs, synchronizes, or forces state | Stop at diagnosis and hand off to the human operator runbook. | `config`, `execute`, forced synchronization, service restart, password work, session control, all writes, and every `diagnose` command except the compiled read-only V2 HA checksum workflow are outside this diagnostic Skill. |
 
-The V4 ZTNA Skill catalogs fixed Access Proxy, dynamic-list, WAD device-context,
-and time-boxed debug projections as future capability gaps. They remain
-unavailable through the current V3 MCP server and do not change the boundary in
-this table.
+For ZTNA evidence, use only the fixed tools currently advertised by the selected
+server profile. A scenario or proposed projection does not make a diagnostic
+available and does not change the boundary in this table.
 
-The currently compiled API evidence surface is limited to nine fixed `GET`
-routes for system status, system global, approval profile, FortiAnalyzer
-setting, license status, HA, current disk usage, Password Changer, and EMS
-status summary. A candidate may reuse a permitted route only after it has a
-dedicated minimized projection, schema and denial tests, source review, and
-separate compatibility evidence.
+The currently compiled API evidence surface is limited to the nine exact `GET`
+routes defined in [read_only.py](../../../../../src/fortipam_mcp/read_only.py): system
+status, system global, approval profile, FortiAnalyzer setting, license status,
+HA, current disk usage, Password Changer, and EMS status summary. A candidate
+may reuse a permitted route only after it has a dedicated minimized projection,
+schema/denial tests, source review, and separate lab acceptance.
 
 ## Required conclusion labels
 

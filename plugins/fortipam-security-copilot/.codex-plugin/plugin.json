@@ -1,7 +1,7 @@
 {
   "name": "fortipam-security-copilot",
-  "version": "1.7.0",
-  "description": "Governed FortiPAM Security Copilot with source-traceable read-only evidence, plan-only administrative Skills, and a minimized OAuth MCP surface.",
+  "version": "1.10.0",
+  "description": "Governed FortiPAM Security Copilot with source-traceable read-only evidence, authenticated V4 planning, and conditionally advertised bounded actions.",
   "author": {
     "name": "lxtsst",
     "url": "https://github.com/lxtsst"
@@ -13,14 +13,15 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "FortiPAM Security Copilot",
-    "shortDescription": "Diagnose FortiPAM safely with bounded read-only evidence.",
-    "longDescription": "Connects Codex to a read-only FortiPAM MCP service and adds product-aware guidance for health, approval, identity, session, gateway, ZTNA access and protected Secret launch, logging, HA, and password-lifecycle triage.",
+    "shortDescription": "Diagnose, plan, and govern bounded FortiPAM actions.",
+    "longDescription": "Connects Codex to minimized FortiPAM evidence and authenticated V4 planning, with product-aware guidance for health, approval, identity, session, gateway, and ZTNA. A bounded action can be advertised only by the controlled profile, its explicit feature flag, a protected authorization reference, and fixed readback.",
     "developerName": "lxtsst",
     "category": "Security",
-    "capabilities": ["Read-only FortiPAM evidence", "Plan-only administrator workflows", "ZTNA access and Secret launch control", "Capability matrix", "Focused FortiPAM Skills", "OAuth MCP"],
+    "capabilities": ["Read-only FortiPAM evidence", "Authenticated V4 administration planning", "Controlled bounded FortiPAM actions", "ZTNA access and Secret launch control", "Capability matrix", "Focused FortiPAM Skills", "OAuth MCP"],
     "defaultPrompt": [
       "Assess my FortiPAM health with read-only evidence.",
       "Build a safe evidence plan for this FortiPAM issue.",
+      "Create one inherited child Folder after showing Current, Proposed, and Expected state.",
       "Check which FortiPAM MCP capabilities can answer my question."
     ],
     "brandColor": "#EE3124"

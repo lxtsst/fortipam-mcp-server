@@ -40,6 +40,11 @@ from .diagnostic_store import (
     DiagnosticStoreError,
 )
 from .evidence_correlation import MAX_EPOCH
+from .ha_reconciliation import (
+    HA_RECONCILIATION_STATUSES,
+    HaReconciliationRuntimeBinding,
+    V4_HA_RECONCILIATION_CONTRACT,
+)
 
 
 DIAGNOSTIC_FAILURE = "FortiPAM diagnostic operation failed."
@@ -48,6 +53,8 @@ MIN_HMAC_KEY_BYTES: Final = 32
 DIAGNOSTIC_PREFIX: Final = "FORTIPAM_MCP_DIAGNOSTIC_"
 DIAGNOSTIC_DB_ENV: Final = f"{DIAGNOSTIC_PREFIX}DB"
 DIAGNOSTIC_HMAC_KEY_FILE_ENV: Final = f"{DIAGNOSTIC_PREFIX}HMAC_KEY_FILE"
+HA_RECONCILIATION_AUDIT_PROFILE_ID: Final = "ha_reconciliation"
+HA_RECONCILIATION_AUDIT_CONTRACT_VERSION: Final = "1"
 _HEX_KEY = re.compile(r"^[0-9a-f]{64}$")
 
 Collector = Callable[[], Awaitable[Mapping[str, object]]]
@@ -125,17 +132,23 @@ class FortiPamDiagnosticService:
         *,
         ha_api_collector: Collector,
         ha_cli_collector: Collector,
+        ha_reconciliation: HaReconciliationRuntimeBinding | None = None,
         clock: Clock | None = None,
     ) -> None:
         if not isinstance(settings, DiagnosticServiceSettings):
             raise DiagnosticServiceError(DIAGNOSTIC_UNAVAILABLE)
         if not callable(ha_api_collector) or not callable(ha_cli_collector):
             raise DiagnosticServiceError(DIAGNOSTIC_UNAVAILABLE)
+        if ha_reconciliation is not None and not isinstance(
+            ha_reconciliation, HaReconciliationRuntimeBinding
+        ):
+            raise DiagnosticServiceError(DIAGNOSTIC_UNAVAILABLE)
         if clock is not None and not callable(clock):
             raise DiagnosticServiceError(DIAGNOSTIC_UNAVAILABLE)
         self._settings = settings
         self._ha_api_collector = ha_api_collector
         self._ha_cli_collector = ha_cli_collector
+        self._ha_reconciliation = ha_reconciliation
         self._clock = clock or (lambda: datetime.now(UTC))
 
     async def create_ha_baseline(
@@ -232,6 +245,36 @@ class FortiPamDiagnosticService:
             raise DiagnosticServiceError(DIAGNOSTIC_FAILURE) from None
         return {"status": relationship}
 
+    async def reconcile_ha(
+        self, access_token: AccessToken | None
+    ) -> dict[str, str]:
+        """Run the internal HA assessment behind OAuth and bounded audit."""
+
+        principal = self._principal(access_token)
+        if self._ha_reconciliation is None:
+            raise DiagnosticServiceError(DIAGNOSTIC_UNAVAILABLE)
+        moment = self._now()
+        store = self._store(principal)
+        try:
+            result = await self._ha_reconciliation.assess()
+            status = result.get("assessment_status")
+            if type(status) is not str or status not in HA_RECONCILIATION_STATUSES:
+                raise ValueError
+            store.append_event(
+                "ha_reconcile",
+                HA_RECONCILIATION_AUDIT_PROFILE_ID,
+                V4_HA_RECONCILIATION_CONTRACT,
+                HA_RECONCILIATION_AUDIT_CONTRACT_VERSION,
+                status,
+                moment,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self._append_rejected_reconciliation(store, moment)
+            raise DiagnosticServiceError(DIAGNOSTIC_FAILURE) from None
+        return {"status": status}
+
     def _principal(self, access_token: AccessToken | None) -> DiagnosticPrincipal:
         try:
             return principal_from_access_token(
@@ -268,6 +311,12 @@ class FortiPamDiagnosticService:
                         HA_API_CLI_CORRELATION_CONTRACT.contract_version,
                         frozenset({"evidence_correlate"}),
                     ),
+                    AuditProfile(
+                        HA_RECONCILIATION_AUDIT_PROFILE_ID,
+                        V4_HA_RECONCILIATION_CONTRACT,
+                        HA_RECONCILIATION_AUDIT_CONTRACT_VERSION,
+                        frozenset({"ha_reconcile"}),
+                    ),
                 ),
             )
         except DiagnosticStoreError:
@@ -298,6 +347,21 @@ class FortiPamDiagnosticService:
                 HA_API_PROJECTION_CONTRACT.contract_id,
                 HA_API_PROJECTION_CONTRACT.contract_id,
                 HA_API_PROJECTION_CONTRACT.version,
+                "rejected",
+                occurred_at,
+            )
+        except DiagnosticStoreError:
+            raise DiagnosticServiceError(DIAGNOSTIC_FAILURE) from None
+
+    def _append_rejected_reconciliation(
+        self, store: DiagnosticBaselineStore, occurred_at: datetime
+    ) -> None:
+        try:
+            store.append_event(
+                "ha_reconcile",
+                HA_RECONCILIATION_AUDIT_PROFILE_ID,
+                V4_HA_RECONCILIATION_CONTRACT,
+                HA_RECONCILIATION_AUDIT_CONTRACT_VERSION,
                 "rejected",
                 occurred_at,
             )
@@ -353,5 +417,7 @@ __all__ = [
     "DiagnosticServiceError",
     "DiagnosticServiceSettings",
     "FortiPamDiagnosticService",
+    "HA_RECONCILIATION_AUDIT_CONTRACT_VERSION",
+    "HA_RECONCILIATION_AUDIT_PROFILE_ID",
     "diagnostic_settings_from_environment",
 ]

@@ -65,7 +65,14 @@
             "c3_values_included": {"const": false}
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"evidence_kind": {"const": "source_backed_projection_contract"}}, "required": ["evidence_kind"]},
+          "then": {"required": ["projection_profile"], "properties": {"device_access": {"const": true}}},
+          "else": {"properties": {"device_access": {"const": false}}, "not": {"required": ["projection_profile"]}}
+        }
+      ]
     },
     "blueprint": {
       "type": "object", "additionalProperties": false,
@@ -97,17 +104,35 @@
     },
     "implementation_evidence": {
       "type": "object", "additionalProperties": false,
-      "required": ["evidence_status", "evidence_kind", "profile_blueprint_refs", "module_refs", "test_refs", "dispatchable", "runtime_packaged", "mcp_exposed", "device_access"],
+      "required": ["evidence_status", "evidence_kind", "profile_blueprint_refs", "module_refs", "test_refs", "dispatchable", "planner_runtime_packaged", "planner_mcp_exposed", "executor_runtime_packaged", "executor_mcp_exposed", "device_access"],
       "properties": {
         "evidence_status": {"enum": ["pending_contract_tests", "contract_tested"]},
-        "evidence_kind": {"const": "fake_only_contract"},
-        "profile_blueprint_refs": {"type": "array", "minItems": 1, "maxItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^FPA-BP-[0-9]{3}$"}},
-        "module_refs": {"const": ["scripts/v4_planning.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/__init__.py"]},
-        "test_refs": {"const": ["tests/test_v4_planning.py"]},
+        "evidence_kind": {"enum": ["fake_only_contract", "source_backed_projection_contract"]},
+        "profile_blueprint_refs": {"oneOf": [{"const": ["FPA-BP-004"]}, {"const": ["FPA-BP-008"]}, {"const": ["FPA-BP-015"]}, {"const": ["FPA-BP-005", "FPA-BP-006", "FPA-BP-007"]}, {"const": ["FPA-BP-014"]}]},
+        "module_refs": {"oneOf": [{"const": ["scripts/v4_planning.py", "scripts/build_v4_plan_runtime.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/store.py", "v4_planning/persistence.py", "v4_planning/workflow_service.py", "v4_planning/mcp_facade.py", "v4_planning/runtime_profile.py", "v4_planning/__init__.py"]}, {"const": ["scripts/v4_planning.py", "scripts/build_v4_plan_runtime.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/store.py", "v4_planning/persistence.py", "v4_planning/workflow_service.py", "v4_planning/mcp_facade.py", "v4_planning/runtime_profile.py", "v4_planning/__init__.py", "src/fortipam_mcp/access_domain_projection_source.py", "src/fortipam_mcp/v4_runtime_host.py"]}, {"const": ["scripts/v4_planning.py", "scripts/build_v4_plan_runtime.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/store.py", "v4_planning/persistence.py", "v4_planning/workflow_service.py", "v4_planning/mcp_facade.py", "v4_planning/runtime_profile.py", "v4_planning/__init__.py", "src/fortipam_mcp/secret_onboarding_projection_source.py", "src/fortipam_mcp/v4_runtime_host.py"]}, {"const": ["scripts/v4_planning.py", "scripts/build_v4_plan_runtime.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/store.py", "v4_planning/persistence.py", "v4_planning/workflow_service.py", "v4_planning/mcp_facade.py", "v4_planning/runtime_profile.py", "v4_planning/__init__.py", "src/fortipam_mcp/approval_and_observe_projection_source.py", "src/fortipam_mcp/v4_runtime_host.py"]}, {"const": ["scripts/v4_planning.py", "scripts/build_v4_plan_runtime.py", "v4_planning/canonical.py", "v4_planning/models.py", "v4_planning/engine.py", "v4_planning/store.py", "v4_planning/persistence.py", "v4_planning/workflow_service.py", "v4_planning/mcp_facade.py", "v4_planning/runtime_profile.py", "v4_planning/__init__.py", "src/fortipam_mcp/ad_discovery_projection_source.py"]}]},
+        "test_refs": {"oneOf": [{"const": ["tests/test_v4_planning.py", "tests/test_v4_m3.py", "tests/test_v4_persistence.py", "tests/test_v4_plan_runtime.py"]}, {"const": ["tests/test_v4_planning.py", "tests/test_v4_m3.py", "tests/test_v4_persistence.py", "tests/test_v4_plan_runtime.py", "tests/test_access_domain_projection_source.py", "tests/test_v4_runtime_host.py"]}, {"const": ["tests/test_v4_planning.py", "tests/test_v4_m3.py", "tests/test_v4_persistence.py", "tests/test_v4_plan_runtime.py", "tests/test_secret_onboarding_projection_source.py", "tests/test_v4_runtime_host.py"]}, {"const": ["tests/test_v4_planning.py", "tests/test_v4_m3.py", "tests/test_v4_persistence.py", "tests/test_v4_plan_runtime.py", "tests/test_approval_and_observe_projection_source.py", "tests/test_v4_runtime_host.py"]}, {"const": ["tests/test_v4_planning.py", "tests/test_v4_m3.py", "tests/test_v4_persistence.py", "tests/test_v4_plan_runtime.py", "tests/test_ad_discovery_projection_source.py"]}]},
         "dispatchable": {"const": false},
-        "runtime_packaged": {"const": false},
-        "mcp_exposed": {"const": false},
-        "device_access": {"const": false}
+        "planner_runtime_packaged": {"const": true},
+        "planner_mcp_exposed": {"const": false},
+        "executor_runtime_packaged": {"const": false},
+        "executor_mcp_exposed": {"const": false},
+        "device_access": {"type": "boolean"},
+        "projection_profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contract_id", "contract_version", "source_ref", "object_classes", "max_age_seconds", "read_only", "raw_responses_returned", "product_selectors_returned"],
+          "properties": {
+            "contract_id": {"enum": ["fortipam-access-domain-folder-observation-v1", "fortipam-secret-onboarding-observation-v1", "approval-and-observe-state-v1", "fortipam-ad-discovery-source-observation-v1"]},
+            "contract_version": {"enum": ["1.0.0", "1.1.0", "1.7.0"]},
+            "source_ref": {"enum": ["fortipam-191-access-domain-projection", "fortipam-191-secret-onboarding-projection", "fortipam-191-approval-observe-projection", "fortipam-700-build29-ad-discovery-projection"]},
+            "additional_contracts": {"const": [{"contract_id": "fortipam-secret-session-controls-observation-v1", "contract_version": "1.1.0", "source_ref": "fortipam-191-secret-session-controls-projection", "object_classes": ["SecretSessionControlsBinding"]}, {"contract_id": "fortipam-web-secret-service-observation-v1", "contract_version": "1.0.0", "source_ref": "fortipam-191-secret-onboarding-projection", "object_classes": ["WebSecretServiceBinding"]}]},
+            "object_classes": {"oneOf": [{"const": ["PublicFolder", "AccessGrant"]}, {"const": ["FolderBinding", "Target", "TemplateBinding", "SecretMetadata", "WebSecretMetadata", "LauncherBinding", "PolicyBinding", "RdpEventFilterBinding"]}, {"const": ["ApprovalProfileBinding", "SecretApprovalBinding"]}, {"const": ["FolderBinding", "DomainTargetBinding", "TemplateBinding", "DomainSecretMetadata", "DiscoverySourceMetadata"]}]},
+            "max_age_seconds": {"const": 300},
+            "read_only": {"const": true},
+            "raw_responses_returned": {"const": false},
+            "product_selectors_returned": {"const": false}
+          }
+        }
       }
     },
     "action": {

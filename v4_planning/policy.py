@@ -95,8 +95,8 @@ class M3PlanPolicy:
         if (
             plan.dispatchable
             or plan.adapter_registry_bound
-            or plan.runtime_packaged
-            or plan.mcp_exposed
+            or plan.executor_runtime_packaged
+            or plan.executor_mcp_exposed
             or any(line.dispatchable or line.adapter != "none" for line in plan.lines)
         ):
             raise PlanPolicyDenied("Prepared plan exceeds the M3 plan-only boundary.")

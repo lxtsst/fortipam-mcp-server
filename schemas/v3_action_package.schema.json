@@ -26,9 +26,10 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "id", "version", "name", "product", "object_kind", "evidence_status",
-        "evidence_refs", "evidence_gaps", "lifecycle", "status", "maturity",
-        "method", "path", "body", "executable", "adapter", "mcp_exposed",
+        "id", "version", "name", "product", "object_kind", "scope", "evidence_status",
+        "source_refs", "evidence_refs", "evidence_gaps", "lifecycle", "status", "maturity",
+        "contract_status", "method", "path", "body", "request_schema", "read_routes",
+        "rollback_contract", "permission_contract", "projection_contract", "executable", "adapter", "mcp_exposed",
         "registered_tool", "dispatchable", "device_access", "max_affected",
         "c3_material_allowed", "required_gates"
       ],
@@ -38,15 +39,43 @@
         "name": {"const": "FortiPAM Folder Create Contract-Readiness Candidate"},
         "product": {"const": "FortiPAM"},
         "object_kind": {"const": "secret/folder"},
+        "scope": {"const": "child_only"},
         "evidence_status": {"const": "evidence_pending"},
-        "evidence_refs": {"type": "array", "maxItems": 0, "items": {"type": "string"}},
+        "source_refs": {
+          "const": [
+            "FPA-SRC-TF-FPAM-FOLDER-F502400A",
+            "FPA-SRC-TF-FPAM-UTILITY-F502400A",
+            "FPA-SRC-TF-FPAM-API-SECRETFOLDER-F502400A",
+            "FPA-SRC-TF-FPAM-BODY5-F502400A",
+            "FPA-SRC-ADMIN-191",
+            "FPA-SRC-CATALOG-190",
+            "FPA-SRC-GUI-OBS-FOLDER-CREATE-READONLY"
+          ]
+        },
+        "evidence_refs": {
+          "const": [
+            "FPA-SRC-TF-FPAM-FOLDER-F502400A",
+            "FPA-SRC-TF-FPAM-UTILITY-F502400A",
+            "FPA-SRC-TF-FPAM-API-SECRETFOLDER-F502400A",
+            "FPA-SRC-TF-FPAM-BODY5-F502400A",
+            "FPA-SRC-ADMIN-191",
+            "FPA-SRC-CATALOG-190",
+            "FPA-SRC-GUI-OBS-FOLDER-CREATE-READONLY"
+          ]
+        },
         "evidence_gaps": {"$ref": "#/$defs/non_empty_strings"},
         "lifecycle": {"const": "catalogued"},
         "status": {"const": "disabled_by_policy"},
         "maturity": {"const": "catalogued"},
-        "method": {"const": "unknown"},
-        "path": {"const": "unknown"},
-        "body": {"const": "unknown"},
+        "contract_status": {"const": "documented"},
+        "method": {"const": "POST"},
+        "path": {"const": "/api/v2/cmdb/secret/folder"},
+        "body": {"const": "folder-create-request-v2"},
+        "request_schema": {"$ref": "#/$defs/request_schema"},
+        "read_routes": {"$ref": "#/$defs/read_routes"},
+        "rollback_contract": {"$ref": "#/$defs/rollback_contract"},
+        "permission_contract": {"$ref": "#/$defs/permission_contract"},
+        "projection_contract": {"$ref": "#/$defs/projection_contract"},
         "executable": {"const": false},
         "adapter": {"const": "none"},
         "mcp_exposed": {"const": false},
@@ -56,6 +85,75 @@
         "max_affected": {"const": 1},
         "c3_material_allowed": {"const": false},
         "required_gates": {"$ref": "#/$defs/non_empty_strings"}
+      }
+    },
+    "request_schema": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "fields", "fixed_defaults", "bounded_inputs"],
+      "properties": {
+        "ref": {"const": "folder-create-request-v2"},
+        "fields": {"const": ["id", "name", "inherit-policy", "inherit-permission", "inherit-folder-ztna", "parent-folder", "user-permission", "group-permission"]},
+        "fixed_defaults": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "inherit-policy", "inherit-permission", "inherit-folder-ztna", "user-permission", "group-permission"],
+          "properties": {
+            "id": {"const": 0}, "inherit-policy": {"const": "enable"}, "inherit-permission": {"const": "enable"},
+            "inherit-folder-ztna": {"const": "enable"},
+            "user-permission": {"const": []}, "group-permission": {"const": []}
+          }
+        },
+        "bounded_inputs": {
+          "const": {
+            "name": {
+              "type": "string",
+              "min_length": 1,
+              "max_length": 64,
+              "path_separators_allowed": false,
+              "control_characters_allowed": false
+            },
+            "parent-folder": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        }
+      }
+    },
+    "read_route": {
+      "type": "object", "additionalProperties": false, "required": ["method", "path"],
+      "properties": {"method": {"const": "GET"}, "path": {"type": "string", "minLength": 1}}
+    },
+    "read_routes": {
+      "type": "object", "additionalProperties": false, "required": ["collection", "detail"],
+      "properties": {
+        "collection": {"allOf": [{"$ref": "#/$defs/read_route"}, {"properties": {"path": {"const": "/api/v2/cmdb/secret/folder"}}}]},
+        "detail": {"allOf": [{"$ref": "#/$defs/read_route"}, {"properties": {"path": {"const": "/api/v2/cmdb/secret/folder/{id}"}}}]}
+      }
+    },
+    "rollback_contract": {
+      "type": "object", "additionalProperties": false, "required": ["method", "path", "status", "precondition"],
+      "properties": {"method": {"const": "DELETE"}, "path": {"const": "/api/v2/cmdb/secret/folder/{id}"}, "status": {"const": "documented_partial"}, "precondition": {"const": "empty_folder_only"}}
+    },
+    "permission_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "collection_read", "detail_read", "child_create", "root_folder_required", "current_lab_evidence", "execution_identity_status", "provider_access_group"],
+      "properties": {
+        "status": {"const": "source_documented_lab_identity_pending"},
+        "collection_read": {"const": "SecretFolder Read"},
+        "detail_read": {"const": "SecretFolder Read"},
+        "child_create": {"const": "SecretFolder Read/Write"},
+        "root_folder_required": {"const": false},
+        "current_lab_evidence": {"const": "v3_api_identity_folder_collection_read_http_403"},
+        "execution_identity_status": {"const": "dedicated_v4_least_privilege_identity_pending"},
+        "provider_access_group": {"const": "secretgrp"}
+      }
+    },
+    "projection_contract": {
+      "type": "object", "additionalProperties": false, "required": ["ref", "status", "fields"],
+      "properties": {
+        "ref": {"const": "folder-readback-projection-v1"}, "status": {"const": "documented_partial"},
+        "fields": {"const": ["exists", "id", "name", "parent-folder", "folder-type", "inherit-policy", "inherit-permission", "inherit-folder-ztna", "secret-policy", "user-permission-count", "group-permission-count"]}
       }
     }
   }

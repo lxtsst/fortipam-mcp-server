@@ -20,6 +20,8 @@ def test_missing_runtime_profile_defaults_to_readonly() -> None:
     (
         ("readonly", RuntimeProfile.READONLY),
         ("lab-simulated", RuntimeProfile.LAB_SIMULATED),
+        ("v4-plan-only", RuntimeProfile.V4_PLAN_ONLY),
+        ("v4-controlled", RuntimeProfile.V4_CONTROLLED),
     ),
 )
 def test_exact_runtime_profile_values_are_accepted(

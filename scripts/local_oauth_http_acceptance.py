@@ -60,7 +60,12 @@ async def run_local_oauth_acceptance(
     the OAuth provider's bounded client-registration capacity.
     """
 
-    load_prefixed_environment_file(login_file, LOGIN_PREFIX)
+    # The explicitly selected owner-only login file is authoritative for this
+    # one-shot client. Never silently reuse stale shell/session credentials.
+    load_prefixed_environment_file(
+        login_file, LOGIN_PREFIX, overwrite=True,
+        required_keys=(LOGIN_USERNAME, LOGIN_PASSWORD),
+    )
     username = os.environ.get(LOGIN_USERNAME)
     password = os.environ.get(LOGIN_PASSWORD)
     if not username or not password:

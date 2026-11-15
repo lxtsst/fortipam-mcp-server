@@ -83,3 +83,35 @@ def test_expected_tool_contract_contains_lab_only_admin_workflow() -> None:
         "preview_v31_lab_folder_access_assignment",
         "execute_confirmed_v31_lab_operation",
     } == set(LAB_ADMIN_TOOLS)
+
+
+def test_stdio_smoke_child_can_import_from_explicit_install_path(tmp_path, monkeypatch):
+    import subprocess
+    import sys
+    from fortipam_mcp import mcp_smoke
+
+    install_root = tmp_path / "installed"
+    install_root.mkdir()
+    (install_root / "isolated_smoke_marker.py").write_text("VALUE = 'installed-package'\n")
+    monkeypatch.setenv("PYTHONPATH", str(install_root))
+    monkeypatch.setenv("UNRELATED_PRIVATE_SETTING", "not-forwarded")
+    monkeypatch.chdir(tmp_path)
+
+    class ChildVerified(Exception):
+        pass
+
+    def inspect_child(parameters, *, errlog):
+        assert "UNRELATED_PRIVATE_SETTING" not in parameters.env
+        child = subprocess.run(
+            [parameters.command, *parameters.args], env=parameters.env,
+            capture_output=True, text=True, check=True,
+        )
+        assert child.stdout.strip() == "installed-package"
+        raise ChildVerified
+
+    monkeypatch.setattr(mcp_smoke, "stdio_client", inspect_child)
+    with pytest.raises(ChildVerified):
+        mcp_smoke.run_smoke([
+            sys.executable, "-c",
+            "from isolated_smoke_marker import VALUE; print(VALUE)",
+        ])

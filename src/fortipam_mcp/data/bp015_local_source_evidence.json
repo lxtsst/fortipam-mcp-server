@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "contract": "fortipam-bp015-local-source-evidence-v1",
+  "product": "FortiPAM",
+  "evidence_state": "official_product_semantics_and_frontend_shape_only",
+  "official_product_semantics": {
+    "source_type": "local_official_pdf",
+    "product_version": "1.9.1",
+    "sha256": "58ccb242e0786f84ad89e99185757f48e31932f9494618198d12b66a47142f9f",
+    "covered_semantics": ["sponsored_group", "sponsor_admin", "invited_user", "secret_group_permission"]
+  },
+  "authenticated_frontend_shape": {
+    "source_type": "authenticated_static_frontend_asset",
+    "product_version": "7.0.0",
+    "product_build": 29,
+    "sha256": "0c2bf35bb5cde1a5154012d6bf2f529d8d59e782a35aebe0bd29976ca9da434f",
+    "size_bytes": 7667190,
+    "observed_fields": ["group-type", "group-max-users", "sponsor-group", "user-permission", "group-permission", "inherit-permission", "secret-permission", "allowed-launcher-type"],
+    "api_contract": false
+  },
+  "sanitized_catalog_routes": {
+    "source_type": "sanitized_fndn_ui_swagger_catalog",
+    "product_version": "1.9.0",
+    "sha256": "d6b20c4e7c5e28092eb5609ebfe0bb3721d19d0e7802ffcb3575f00d6a18a975",
+    "routes": ["GET /api/v2/cmdb/user/group", "GET /api/v2/cmdb/user/group/{name}", "GET /api/v2/cmdb/firewall.schedule/recurring", "GET /api/v2/cmdb/firewall.schedule/recurring/{name}"],
+    "response_schema_available": false
+  },
+  "non_promotion": {
+    "source_contract_ready": false,
+    "device_access": false,
+    "dispatchable": false,
+    "frontend_is_not_an_api_contract": true,
+    "protected_values_stored": false
+  }
+}

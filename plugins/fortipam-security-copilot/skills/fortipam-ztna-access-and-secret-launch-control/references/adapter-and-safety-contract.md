@@ -2,11 +2,17 @@
 
 ## Current coverage
 
-The current V3 MCP server provides only the minimized aggregate
-`get_ems_connection_posture_summary`. It does not prove endpoint enrollment,
-same-EMS association, tag synchronization, Access Proxy effective values,
-proxy-policy enforcement, WAD device context, Folder/Secret ZTNA control, or
-Secret launch. No current Tool executes the CLI or changes FortiPAM.
+The current V4 surface includes the minimized aggregate
+`get_ems_connection_posture_summary`, separately gated read-only
+`ztna-device-context-diagnostic` and `ztna-folder-control-posture` packages,
+the separately gated Access Proxy
+client-certificate prerequisite, and a disabled-by-default local Access-level
+`ztna-user-control.configure` package. The two mutation packages require an
+exact Current/Proposed/Expected preview, requester-bound confirmation, drift
+rejection, and fixed categorical CLI readback. Neither is candidate-deployed or
+lab-accepted. The surface still does not prove endpoint enrollment, same-EMS
+association, tag synchronization, full Folder/Secret ZTNA control, Secret
+launch, least-privilege permission, HA, rollback, or production readiness.
 
 ## Future adapter split
 
@@ -25,11 +31,11 @@ Candidate atomic packages are:
 
 | Package | Purpose | Current state |
 | --- | --- | --- |
-| `ztna-access-proxy-client-certificate-policy` | Read and set `client-cert` plus an explicitly selected `empty-cert-action`. | Contract missing; disabled. |
-| `ztna-access-level-proxy-policy` | Read and set `ztna-status` and the bounded EMS tag reference for portal enforcement. | Contract missing; disabled. |
-| `ztna-folder-control` | Read and set one Folder's ZTNA control, tag references, and AND/OR logic. | API/body/permission contract missing; disabled. |
-| `ztna-secret-control-override` | Read and set one Secret's inheritance/override and bounded ZTNA control. | API/body/permission contract missing; disabled. |
-| `ztna-device-context-diagnostic` | Produce a categorical tag-sync/device-context projection from fixed diagnostics. | Projector and permission contract missing; disabled. |
+| `ztna-access-proxy-client-certificate-policy` | Read and set `client-cert` plus an explicitly selected `empty-cert-action`. | Local package complete, disabled, not candidate-deployed or lab-accepted. |
+| `ztna-user-control.configure` | Read one private Access-level policy with its existing EMS tag and set only `ztna-status=enable` for portal enforcement. | Local package complete, disabled, not candidate-deployed or lab-accepted. |
+| `ztna-folder-control` | Read one Folder's inheritance/tag observability, or future set one Folder's ZTNA control, tag references, and AND/OR logic. | A fixed no-value posture read is locally packaged and disabled; the exact FortiPAM 1.9.1 no-C3 write/readback contract is still missing, so all Folder writes remain disabled. |
+| `ztna-secret-control-override` | Read and set one Secret's inheritance/override and bounded ZTNA control. | Product behavior is documented, but the Secret projection can include field values and no safe no-C3 update/readback contract is established; disabled. |
+| `ztna-device-context-diagnostic` | Produce a categorical client-certificate, dynamic-list, and WAD-device-context projection from fixed diagnostics. | Local package complete, disabled, not candidate-deployed or live read-only accepted. |
 | `ztna-wad-debug-capture` | Time-box a single sanitized WAD diagnostic capture and always disable debug. | High-risk contract missing; disabled. |
 
 Do not combine these into one opaque write. Each product object requires its
@@ -51,5 +57,7 @@ pre-write re-read, post-write readback, and rollback/reconciliation result.
 - one bounded object per atomic action; and
 - exact Actual State versus Expected State readback before success.
 
-Until these gates are promoted separately, output
+For a requested control without one of the four local packages, output
 `execution_state=plan_only`, `adapter=none`, and the exact missing evidence.
+For a local package, disclose that it is disabled and unaccepted until its
+runtime gates and separate candidate/live evidence are promoted.

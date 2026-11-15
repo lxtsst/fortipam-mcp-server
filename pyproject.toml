@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fortipam-mcp-server"
-version = "3.1.3"
-description = "Governed FortiPAM MCP server with a default-readonly device surface and an explicitly selected lab workflow profile."
+version = "4.0.0b108"
+description = "Governed FortiPAM MCP server with a preserved read-only device surface and an isolated V4 control plane."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
@@ -24,6 +24,8 @@ dependencies = [
     "asyncssh>=2.24.0,<3.0.0",
     "httpx>=0.28.0,<1.0.0",
     "mcp>=2.0.0,<3.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "PyYAML>=6.0.0,<7.0.0",
     "PyJWT[crypto]>=2.10.0,<3.0.0",
     "truststore>=0.10.4,<1.0.0",
     "uvicorn>=0.30.0,<1.0.0",
@@ -36,9 +38,22 @@ Issues = "https://github.com/lxtsst/fortipam-mcp-server/issues"
 Source = "https://github.com/lxtsst/fortipam-mcp-server"
 
 [project.optional-dependencies]
+saml-metadata = [
+    "defusedxml==0.7.1",
+    "cryptography>=42.0.0",
+]
+bulk-import = [
+    "msoffcrypto-tool==6.0.0",
+    "openpyxl==3.1.5",
+    "defusedxml==0.7.1",
+]
 dev = [
+    "defusedxml==0.7.1",
+    "cryptography>=42.0.0",
     "mypy>=1.0.0",
     "pytest>=7.0.0",
+    "pytest-xdist>=3.8,<4",
+    "python-dotenv>=1.0.0,<2.0.0",
 ]
 
 [project.scripts]
@@ -47,10 +62,29 @@ fortipam-mcp-http = "fortipam_mcp.http_server:main"
 fortipam-mcp-local-oauth-hash = "fortipam_mcp.local_oauth:password_hash_main"
 fortipam-mcp-http-smoke = "fortipam_mcp.http_smoke:main"
 fortipam-mcp-smoke = "fortipam_mcp.mcp_smoke:main"
+fortipam-mcp-v4-checkpoint = "fortipam_mcp.planning_checkpoint_sidecar:main"
+fortipam-mcp-v4-approver-checkpoint = "fortipam_mcp.approver_checkpoint_sidecar:main"
+fortipam-mcp-v4-approver-authority = "fortipam_mcp.approver_authority_sidecar:main"
+fortipam-mcp-v4-approval-receipt = "fortipam_mcp.approval_receipt_sidecar:main"
+fortipam-mcp-v4-scheme-draft-authority = "fortipam_mcp.scheme_draft_authority_sidecar:main"
+fortipam-mcp-v4-scheme-draft-checkpoint = "fortipam_mcp.scheme_draft_checkpoint_sidecar:main"
+fortipam-mcp-v4-reference-authority = "fortipam_mcp.reference_authority_sidecar:main"
+fortipam-mcp-v4-reference-checkpoint = "fortipam_mcp.reference_checkpoint_sidecar:main"
+fortipam-mcp-v4-secret-create-runtime = "fortipam_mcp.secret_create_runtime_sidecar:main"
+fortipam-mcp-v4-secret-create-readiness = "fortipam_mcp.secret_create_readiness_sidecar:main"
+fortipam-mcp-v4-material-checkpoint = "fortipam_mcp.material_checkpoint_sidecar:main"
+fortipam-mcp-v4-approver-bootstrap = "fortipam_mcp.approver_delegation_bootstrap:main"
+fortipam-mcp-v4-draft-bootstrap = "fortipam_mcp.scheme_draft_bootstrap:main"
+fortipam-mcp-v4-reference-bootstrap = "fortipam_mcp.reference_grant_bootstrap:main"
+fortipam-mcp-v4-linux-onboarding-prepare = "fortipam_mcp.linux_onboarding_prepare:main"
+fortipam-mcp-v4-secret-onboarding-prepare = "fortipam_mcp.linux_onboarding_prepare:main"
+fortipam-mcp-v4-unix-discovery-onboarding-prepare = "fortipam_mcp.unix_discovery_onboarding_prepare:main"
+fortipam-mcp-v4-ad-discovery-prepare = "fortipam_mcp.ad_discovery_prepare:main"
+fortipam-mcp-v4-approval-workflow-prepare = "fortipam_mcp.approval_workflow_prepare:main"
 fortipam-scenario-check = "fortipam_mcp.scenario_check:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fortipam_mcp"]
+packages = ["src/fortipam_mcp", "v4_planning"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

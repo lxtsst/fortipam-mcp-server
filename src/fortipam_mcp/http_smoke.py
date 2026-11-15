@@ -144,6 +144,9 @@ def run_smoke() -> dict[str, Any]:
         raise RuntimeError("Streamable HTTP Prompt rendering returned no messages.")
     if "error" not in prompt_rejected.json():
         raise RuntimeError("Streamable HTTP Prompt accepted an undeclared argument.")
+    rejected_prompt_response = json.dumps(prompt_rejected.json(), sort_keys=True)
+    if "not-accepted" in rejected_prompt_response or "input_value" in rejected_prompt_response:
+        raise RuntimeError("Streamable HTTP Prompt reflected a rejected argument value.")
     tools_by_name = {
         tool.get("name"): tool for tool in tools if isinstance(tool, dict)
     }

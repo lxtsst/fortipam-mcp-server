@@ -1,144 +1,94 @@
 ---
 name: fortipam-governed-administration-workflow
-description: "Guide a FortiPAM administrator through a bounded mutable-workflow conversation: complete non-secret requirements, render a Final Intent Summary, obtain explicit confirmation, evaluate execution readiness, and require readback. Use for a proposed Folder, access grant, Target, Secret metadata, or Local User change. Never treat this Skill as device authority or accept C3 material."
+description: "Guide a bounded FortiPAM change from non-secret requirements through policy-appropriate intent handling, exact controlled execution when advertised, and final readback. Use for Folder, access grant, Target, Secret onboarding or approval policy, and Local User changes; never accept C3 material or treat Skill text as device authority."
 ---
+
+Deployment authorization: this repository grants no standing authority. Lab-mode instructions require separate, explicit authorization for the exact isolated test workflow and a runtime policy that permits that mode. Manual administration still requires the documented parent confirmation. Product approvals and server-side authorization remain mandatory.
 
 # FortiPAM Governed Administration Workflow
 
-Use this Skill to structure an administrative change request. It works in two
-modes:
+Use this Skill for one bounded administrator outcome. A workflow may contain
+several dependent fixed actions when the server represents them in one Scheme
+Draft and one immutable parent Plan. Do not split such a workflow into repeated
+approval cycles. Unrelated outcomes remain separate tasks.
 
-- **Current V3.1 lab mode:** only a separately implemented adapter that reports
-  `lab_simulated` and `device_contacted=false` may perform the bounded
-  demonstration action.
-- **Future real-device mode:** currently unavailable. Do not claim it is ready
-  until the exact V3.2 FortiPAM 1.9.1 adapter and all enablement gates are
-  independently accepted.
+## 1. Select the Live Mode
 
-The Skill cannot create an MCP Tool, select an endpoint, infer a request body,
-hold credentials, invoke a GUI/API/CLI, issue an approval, or bypass the
-empty V3 action registry and deny-all product adapter.
+- **Controlled workflow:** use an exact workflow Tool advertised by the current
+  `v4-controlled` runtime. Access Domain and supported Secret onboarding Tools
+  accept only `plan_ref` and `scheme_draft_ref` and internally bind their fixed
+  child actions.
+- **Controlled single action:** use one currently advertised matching
+  Preview/Confirm/Execute triplet.
+- **Plan-only:** use when the exact executor or required authorization/Gate is
+  absent. A prepared plan remains non-executable.
 
-## 1. Classify the Request
+Never derive Tool names, endpoints, payloads, or availability from this Skill,
+source imports, or previous sessions. Use only current discovery and the exact
+registered schema.
 
-Accept only one bounded outcome at a time:
+## 2. Complete Only Missing Requirements
 
-- create one Public Folder;
-- configure one Public Folder access relation;
-- create one Target metadata record;
-- create one Secret metadata record; or
-- create one Local User metadata record.
+Restate the outcome, environment/scope, accountable owner, desired
+relationships, expected postcondition, and material external effects. Ask only
+for decisions that are both missing and necessary. Do not ask the administrator
+to restate values already fixed by the current Draft or owner-only binding.
 
-If one request contains several outcomes, decompose it into a dependency-ordered
-backlog and process each item through a separate preview and confirmation. A
-typical onboarding order is Local User, Public Folder, Target, Secret metadata,
-then Folder access assignment; adjust only when an authoritative Current State
-proves a different dependency. Never use one confirmation for the whole batch.
+Passwords, keys, tokens, credential values, and private provider locators are
+C3 and must never enter model context, MCP arguments/results, Plans, tests, or
+logs. Use only categorical material metadata such as provider class, purpose,
+and availability. Do not infer product schemas or arbitrary write bodies.
 
-For a Public Folder access relation, keep four decisions separate:
+## 3. Apply the Intent Policy Once
 
-```text
-User or Group -> Folder Permission -> Secret Permission -> Allowed Service
-```
+Use the accepted minimized read path to obtain fresh Current State. Render the
+server-produced Final Intent Summary with Current State, Proposed Changes,
+Expected State, scope, effects, material boundary, verification, stop condition,
+revision, digest, and expiry. Keep the presentation concise; do not duplicate
+every internal planning field.
 
-For Secret onboarding, explain the observed GUI order:
+For ordinary manual administration, obtain one explicit requester confirmation
+for the complete immutable parent Plan. It covers every listed child action;
+do not add another chat approval around the authenticated protocol or each child.
 
-```text
-Template -> Folder -> Target -> Host -> Username -> Password
-```
+For owner-authorized lab acceptance, use the existing exact local acceptance
+client with its protected workflow binding and proceed under standing lab
+authority. Do not ask for, simulate, or wait on human review, conversational
+confirmation, or a separate reviewer. If the current runtime still calls its
+one-time intent-binding record `confirmation`, the client may generate and
+consume that technical record without pausing; it is not a human approval.
+Never bypass an independent product approval that is itself the behavior under
+test, or change the public Tool contract. An installed Skill alone grants no
+lab authority.
 
-Only Template, Folder, Target, and non-secret metadata may enter the normal
-workflow. Host/Username are sensitive locators/identifiers and Password is
-C3. Do not ask for, display, store, summarize, hash, or pass them through the
-Skill, model context, MCP argument/result, plan, test, or audit record.
+Read-only discovery and an identical-scope refresh do not need approval. If a
+preview expires, refresh it automatically. Regenerate valid technical records
+through the existing authorized client only for the same C/P/E and protected
+bindings; never reuse expired/consumed records. Ask only for a material change
+outside current authority or an actual user action required by the runtime.
+A missing binding, fixture, or Gate is a prerequisite to resolve within existing
+authority, not a generic "approved?" prompt. Report an unsupported mode honestly.
 
-Treat Local User as a six-step GUI wizard, but do not infer the six page
-schemas from that observation. The current lab workflow may use only its
-bounded metadata fixture.
+## 4. Execute and Verify
 
-## 2. Complete Requirements
+For a controlled workflow, invoke the exact workflow Tool once with only its
+parent Plan and Draft references. For a controlled single action, use only its
+matched confirmation and execute pair. Do not call child actions separately
+when the parent workflow owns them.
 
-Restate the intended outcome and clearly separate facts, assumptions, and
-unknowns. Ask only for missing non-secret information:
+The runtime must re-read Current State immediately before the first write and
+stop on drift. After execution, require fixed readback of the complete expected
+relationship set. Report success only for an exact match; otherwise report the
+returned failure or `reconciliation_required` without replaying a consumed
+authorization.
 
-1. environment and bounded scope reference;
-2. requester and accountable owner;
-3. one object class and one object reference or simulated fixture reference;
-4. desired relationships/permissions/allowed service as applicable;
-5. expected state and observable acceptance condition;
-6. risk class, external effect, maintenance window, reversibility and
-   reconciliation expectation; and
-7. evidence owner and expiry expectation.
+## 5. Report Concisely
 
-Stop rather than guess if the request requires an unknown API field, a real
-product locator, a bulk operation, a real user/group entitlement, a password,
-a token, a key, a raw response, an unbounded list, or an unaccepted adapter.
+Return the selected mode, any genuinely missing decision, the C/P/E summary and
+intent-policy state, execution/readback result, and next action. Do not expose
+raw product data, private selectors, credentials, payloads, or internal object
+identifiers.
 
-## 3. Read and Render the Final Intent Summary
-
-Perform optional discovery only through already accepted read-only tools or a
-fixed lab-simulated projection. Obtain a minimized authoritative Current State
-for the target. If it is unavailable, stale, incomplete, contradictory,
-unauthorized, raw, or C3-bearing, stop before a prepared plan.
-
-Render a versioned **Final Intent Summary** with these exact headings:
-
-1. Requested outcome and bounded scope
-2. Current State (source/version, freshness, digest, safety status)
-3. Proposed Changes
-4. Expected State and postcondition
-5. Facts, assumptions, unresolved gaps, and excluded scope
-6. Risk, external effects, maintenance, reversibility, and reconciliation
-7. Required confirmation, policy approval, execution authorization, and
-   readback gates
-8. Evidence policy, stop conditions, summary revision, expiry, and digest
-
-Confirmation is only the requester's acknowledgement of the exact summary. It
-is not a security approval, an adapter permission, or execution authorization.
-Any change to scope, objects, action family, assumptions, material boundary,
-risk, external effects, compensation/reconciliation, current/expected state,
-evidence, digest, revision, or expiry invalidates it.
-
-## 4. Confirm, Execute, and Read Back
-
-Ask the authenticated requester for an explicit affirmative confirmation of
-the displayed Final Intent Summary revision/digest. Do not infer assent from
-conversation, silence, a prior confirmation, or an approver's decision.
-
-Before any action, re-read the fixed Current State and compare it to the
-confirmed digest. Drift or expiry invalidates confirmation, the prepared plan,
-and any approval; return to a new preview.
-
-For **current lab mode only**, execute one action only after the runtime
-proves `adapter_kind=lab_simulated` and `device_contacted=false`. Otherwise,
-stop at the confirmed plan. Do not invoke or imitate a real FortiPAM API, GUI,
-CLI, or credential flow.
-
-After a permitted lab-simulated action, require a fixed post-action readback
-and compare Actual State with Expected State. Report `completed` only for an
-exact match. If readback is unavailable, malformed, stale, or mismatched,
-report `verification_unknown` or `verification_failed`; never report success.
-
-## 5. Output Format
-
-Return a concise, redacted result containing:
-
-- selected workflow mode (`plan_only`, `lab_simulated`, or
-  `real_device_unavailable`);
-- completed/missing requirements;
-- Current/Proposed/Expected preview or the reason it cannot be rendered;
-- Final Intent Summary revision/digest and confirmation status;
-- pre-write comparison, bounded execution status, and post-readback status;
-- evidence gaps and the next safe action; and
-- an explicit `device_contacted=false` declaration for every V3.1 lab result.
-
-Never output raw product data, URLs, endpoints, hostnames, account names,
-passwords, tokens, keys, material-provider locators, or API/GUI/CLI payloads.
-
-## 6. Reference
-
-Use the repository's [`ARCHITECTURE.md`](../../../../docs/ARCHITECTURE.md) and
-[`SECURITY_MODEL.md`](../../../../docs/SECURITY_MODEL.md) for the public runtime
-and trust boundaries.
-For broad plan-only administration requests, use
-`fortipam-administrator-router` first.
+Use `fortipam-administrator-router` to select the Blueprint, Skill SKU, and
+Scheme. Use `fortipam-child-folder-create` only for a standalone child-Folder
+request, not for a Folder already owned by a combined onboarding parent Plan.

@@ -2,27 +2,22 @@
 
 ## Supported version
 
-Security fixes are maintained for the latest tagged release line. The current
-supported release line is `3.1.x`.
+The current development pre-release line is `4.0.x`. Beta versions require
+deployment-specific validation. The earlier v3.1.3 source remains available;
+do not assume V4 features exist in that version.
 
 ## Reporting a vulnerability
 
-Report vulnerabilities privately to the repository owner through GitHub's
-private security-advisory workflow when available. If that workflow is not
-available, contact the maintainer privately before opening an issue.
+Use the repository's private security-advisory workflow when available.
+Otherwise contact the maintainer privately before opening a public issue.
+Provide the affected version, impact, and a minimal reproduction with synthetic
+data. Do not attach credentials, private keys, addresses, customer data, Secret
+values, recordings, cookies, sessions, or raw appliance responses.
 
-Do not include API tokens, passwords, SSH private keys, device addresses,
-customer data, Secret values, recordings, raw FortiPAM responses, cookies, or
-session material in an issue, pull request, or advisory attachment.
+## Runtime boundary
 
-Include only the minimum reproducible information: affected version, component,
-impact, safe reproduction steps using synthetic data, and a proposed mitigation
-if known. Please allow reasonable time for triage and remediation before public
-disclosure.
-
-## Security boundary
-
-This project is read-only by design. A report that proposes generic endpoint or
-command execution, TLS-verification bypass, credential logging, Secret custody,
-or configuration mutation is a design-boundary change and will not be accepted
-as a routine fix.
+The default device surface is read-only. The planning profile cannot execute
+device changes. Controlled actions require explicit binding, individual feature
+gates, scoped authorization, current-state checks, and their fixed recovery
+contracts. All execution gates default closed. Planning and metadata do not
+grant execution authority. See [the security model](docs/SECURITY_MODEL.md).

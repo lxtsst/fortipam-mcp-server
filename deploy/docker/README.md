@@ -1,17 +1,22 @@
-# Docker deployment
+# Docker Packaging
 
-Build the deterministic wheel first, then build the image using the exact wheel SHA-256:
+The Dockerfile installs a verified wheel and dependency wheelhouse. It verifies
+their SHA-256 manifest and records the application-wheel digest in an OCI label.
+It does not include credentials or a shared appliance configuration.
 
-```bash
-SOURCE_DATE_EPOCH=1700000000 python -m build --wheel --no-isolation
-APP_WHEEL_SHA256="$(shasum -a 256 dist/fortipam_mcp_server-3.1.3-py3-none-any.whl | awk '{print $1}')"
-docker build \
-  --build-arg APP_WHEEL_SHA256="${APP_WHEEL_SHA256}" \
-  --tag fortipam-mcp-server:3.1.3 .
-```
+Build the application wheel from this source, refresh its entry in
+`wheelhouse-manifest.sha256`, then prepare the dependency wheelhouse with
+`download_wheelhouse.sh`. Supply the application digest as `APP_WHEEL_SHA256`.
+Use a base image that matches the pinned Dockerfile digest and target platform.
+The build uses local wheels and supports `--network=none` once those inputs exist.
 
-The image runs as a non-root user. Use a read-only root filesystem, drop all capabilities, mount credentials as read-only secrets, and expose the service only through an HTTPS reverse proxy when remote access is required.
+The image starts `fortipam-mcp-http` as a non-root user. Configure explicit memory
+limits, a read-only root filesystem, a loopback backend, protected secret mounts,
+and only the writable state directories required by the chosen profile. Place
+remote access behind verified HTTPS and OAuth. Keep each deployment's state,
+credentials, and recovery backup separate.
 
-The default runtime profile is read-only. The optional `lab-simulated` profile writes only isolated local fixtures and must not be treated as FortiPAM write support.
-
-Runtime dependency hashes are pinned in `runtime-constraints.txt` and `wheelhouse-manifest.sha256`. Use `download_wheelhouse.sh` only on a trusted build host and verify the generated wheelhouse before transferring it to an offline build environment.
+Container runtime and target-appliance qualification are deployment-specific.
+Passing source tests or building an image does not establish that qualification.
+See [deployment](../../docs/DEPLOYMENT.md) and
+[security](../../docs/SECURITY_MODEL.md).

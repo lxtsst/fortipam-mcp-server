@@ -18,6 +18,12 @@ from fortipam_mcp.diagnostic_service import (
     FortiPamDiagnosticService,
     diagnostic_settings_from_environment,
 )
+from fortipam_mcp.ha_reconciliation import (
+    BoundHaReconciliation,
+    HaReconciliationPrerequisites,
+    HaReconciliationQueryPermission,
+    HaReconciliationRuntimeBinding,
+)
 
 
 NOW = datetime(2026, 8, 22, 12, tzinfo=UTC)
@@ -104,11 +110,92 @@ def _cli_result(*, mode: str = "standalone") -> dict[str, object]:
     }
 
 
+def _status_result() -> dict[str, object]:
+    return {
+        "workflow_id": "ha_status",
+        "execution_status": "completed",
+        "evidence": {
+            "evidence_status": "complete",
+            "ha_mode": "standalone",
+            "ha_health": "healthy",
+            "member_count_band": "single",
+            "configuration_sync": "not_applicable",
+            "peer_identity_returned": False,
+            "network_values_returned": False,
+            "exact_time_returned": False,
+            "raw_cli_returned": False,
+        },
+        "raw_cli_returned": False,
+        "credential_values_returned": False,
+    }
+
+
+def _checksum_result() -> dict[str, object]:
+    return {
+        "workflow_id": "ha_checksum",
+        "execution_status": "completed",
+        "evidence": {
+            "evidence_status": "complete",
+            "ha_mode": "standalone",
+            "checksum_assessment": "not_applicable",
+            "member_count_band": "single",
+            "exact_checksum_returned": False,
+            "member_identity_returned": False,
+            "table_name_returned": False,
+            "raw_cli_returned": False,
+        },
+        "raw_cli_returned": False,
+        "credential_values_returned": False,
+    }
+
+
+def _bound_reconciliation(
+    *, invalid_status: bool = False, calls: list[str] | None = None
+) -> HaReconciliationRuntimeBinding:
+    def collector(name: str, result: dict[str, object]):
+        async def collect() -> dict[str, object]:
+            if calls is not None:
+                calls.append(name)
+            return deepcopy(result)
+
+        return collect
+
+    status = _status_result()
+    if invalid_status:
+        status["private_detail"] = "must-not-leak"
+    composition = BoundHaReconciliation(
+        api_configuration_collector=collector("api", _api_result()),
+        cli_configuration_collector=collector("configuration", _cli_result()),
+        cli_status_collector=collector("status", status),
+        cli_checksum_collector=collector("checksum", _checksum_result()),
+        prerequisite_provider=lambda: HaReconciliationPrerequisites(
+            expected_member_inventory_verified=True,
+            expected_roles_verified=True,
+            compatibility_verified=True,
+            heartbeat_health_verified=True,
+            maintenance_failover_reviewed=True,
+            local_evidence_accounted_for=True,
+        ),
+    )
+    return HaReconciliationRuntimeBinding(
+        composition,
+        lambda: HaReconciliationQueryPermission(
+            api_configuration_read_verified=True,
+            cli_configuration_read_verified=True,
+            cli_status_read_verified=True,
+            cli_checksum_read_verified=True,
+            dedicated_identity_verified=True,
+            cross_domain_denial_verified=True,
+        ),
+    )
+
+
 def _service(
     tmp_path: Path,
     *,
     api_result: dict[str, object] | None = None,
     cli_result: dict[str, object] | None = None,
+    reconciliation: HaReconciliationRuntimeBinding | None = None,
     clock: object = None,
 ) -> FortiPamDiagnosticService:
     api = _api_result() if api_result is None else api_result
@@ -124,6 +211,7 @@ def _service(
         DiagnosticServiceSettings(tmp_path / "state" / "diagnostic.sqlite3", KEY, RESOURCE),
         ha_api_collector=collect_api,
         ha_cli_collector=collect_cli,
+        ha_reconciliation=reconciliation,
         clock=(lambda: NOW) if clock is None else clock,  # type: ignore[arg-type]
     )
 
@@ -209,6 +297,86 @@ def test_correlation_detects_contradiction(tmp_path: Path) -> None:
     assert asyncio.run(service.correlate_ha_api_cli(_token())) == {
         "status": "contradictory"
     }
+
+
+def test_reconciliation_is_authenticated_minimized_and_audited(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+    service = _service(
+        tmp_path,
+        reconciliation=_bound_reconciliation(calls=calls),
+    )
+
+    result = asyncio.run(service.reconcile_ha(_token()))
+
+    assert result == {"status": "eligible_for_operator_review"}
+    assert sorted(calls) == ["api", "checksum", "configuration", "status"]
+    database = tmp_path / "state" / "diagnostic.sqlite3"
+    with sqlite3.connect(database) as connection:
+        event = connection.execute(
+            "SELECT event_type, profile, contract_id, contract_version, outcome "
+            "FROM audit_events"
+        ).fetchone()
+    assert event == (
+        "ha_reconcile",
+        "ha_reconciliation",
+        "fortipam_v4_ha_reconciliation_assessment_v1",
+        "1",
+        "eligible_for_operator_review",
+    )
+    stored = database.read_bytes()
+    assert b"operator-one" not in stored
+    assert b"verified-token" not in stored
+
+
+def test_reconciliation_denies_missing_binding_and_scope_before_collection(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+    unbound = _service(tmp_path / "unbound")
+    with pytest.raises(DiagnosticServiceError, match=DIAGNOSTIC_UNAVAILABLE):
+        asyncio.run(unbound.reconcile_ha(_token()))
+
+    bound = _service(
+        tmp_path / "scope",
+        reconciliation=_bound_reconciliation(calls=calls),
+    )
+    with pytest.raises(DiagnosticServiceError, match=DIAGNOSTIC_UNAVAILABLE):
+        asyncio.run(bound.reconcile_ha(_token(scopes=["fortipam:read"])))
+    assert calls == []
+
+
+def test_reconciliation_failure_is_non_disclosing_and_audited(
+    tmp_path: Path,
+) -> None:
+    service = _service(
+        tmp_path,
+        reconciliation=_bound_reconciliation(invalid_status=True),
+    )
+
+    with pytest.raises(DiagnosticServiceError) as caught:
+        asyncio.run(service.reconcile_ha(_token()))
+
+    assert str(caught.value) == DIAGNOSTIC_FAILURE
+    assert "private_detail" not in str(caught.value)
+    with sqlite3.connect(tmp_path / "state" / "diagnostic.sqlite3") as connection:
+        assert connection.execute(
+            "SELECT event_type, outcome FROM audit_events"
+        ).fetchall() == [("ha_reconcile", "rejected")]
+
+
+def test_reconciliation_constructor_rejects_untyped_binding(tmp_path: Path) -> None:
+    async def collect() -> dict[str, object]:
+        return {}
+
+    with pytest.raises(DiagnosticServiceError, match=DIAGNOSTIC_UNAVAILABLE):
+        FortiPamDiagnosticService(
+            DiagnosticServiceSettings(tmp_path / "state.db", KEY, RESOURCE),
+            ha_api_collector=collect,
+            ha_cli_collector=collect,
+            ha_reconciliation=object(),  # type: ignore[arg-type]
+        )
 
 
 @pytest.mark.parametrize(

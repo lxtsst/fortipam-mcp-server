@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 
 import pytest
 
 from fortipam_mcp.env import EnvironmentFileError
+from fortipam_mcp.env import load_prefixed_environment_file
 from scripts.local_oauth_http_acceptance import (
     CLIENT_STATE_KEY,
     LOGIN_PASSWORD,
@@ -71,6 +73,48 @@ def test_local_oauth_acceptance_rejects_unprotected_login_file(
                 client_state_file,
             )
         )
+
+
+def test_explicit_login_file_can_replace_stale_process_credentials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    login_file = tmp_path / "login.env"
+    login_file.write_text(
+        f"{LOGIN_USERNAME}=current-operator\n"
+        f"{LOGIN_PASSWORD}=current-password-value\n",
+        encoding="utf-8",
+    )
+    login_file.chmod(0o600)
+    monkeypatch.setenv(LOGIN_USERNAME, "stale-operator")
+    monkeypatch.setenv(LOGIN_PASSWORD, "stale-password-value")
+
+    loaded = load_prefixed_environment_file(
+        login_file,
+        "FORTIPAM_MCP_LOCAL_OAUTH_",
+        overwrite=True,
+    )
+
+    assert loaded == 2
+    assert os.environ[LOGIN_USERNAME] == "current-operator"
+    assert os.environ[LOGIN_PASSWORD] == "current-password-value"
+
+
+@pytest.mark.parametrize("entry", ["", f"{LOGIN_PASSWORD}=\n", "WRONG_PASSWORD=value\n"])
+def test_incomplete_login_file_never_borrows_stale_password(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entry: str,
+) -> None:
+    login_file = tmp_path / "login.env"
+    login_file.write_text(f"{LOGIN_USERNAME}=current-operator\n{entry}", encoding="utf-8")
+    login_file.chmod(0o600)
+    monkeypatch.setenv(LOGIN_USERNAME, "stale-operator")
+    monkeypatch.setenv(LOGIN_PASSWORD, "stale-password-value")
+    with pytest.raises(EnvironmentFileError, match="missing from the selected file"):
+        asyncio.run(run_local_oauth_acceptance(
+            "https://mcp.example/fpamcp", login_file, tmp_path / "client.env",
+        ))
+    assert os.environ[LOGIN_USERNAME] == "stale-operator"
+    assert not (tmp_path / "client.env").exists()
 
 
 def test_client_state_is_owner_only_and_reusable(tmp_path: Path) -> None:

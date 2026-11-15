@@ -1,3 +1,3 @@
-"""Local-first FortiPAM MCP server with a separately bounded V3.1 lab profile."""
+"""Local-first governed FortiPAM MCP server."""
 
-__version__ = "3.1.3"
+__version__ = "4.0.0b108"

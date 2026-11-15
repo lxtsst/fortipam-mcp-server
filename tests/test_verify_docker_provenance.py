@@ -11,13 +11,13 @@ IMAGE_ID = "sha256:" + "a" * 64
 WHEEL_SHA256 = "b" * 64
 
 
-def _image() -> dict[str, object]:
+def _image(*, entrypoint: str = "fortipam-mcp-server") -> dict[str, object]:
     return {
         "Id": IMAGE_ID,
         "Config": {
             "Labels": {provenance.APP_WHEEL_LABEL: WHEEL_SHA256},
             "User": "10001:10001",
-            "Entrypoint": ["fortipam-mcp-server"],
+            "Entrypoint": [entrypoint],
         },
     }
 
@@ -128,7 +128,10 @@ def test_provenance_supports_http_entrypoint_and_rejects_unknown_readonly_mount(
 ) -> None:
     http_container = _container()
     http_container["Config"]["Entrypoint"] = ["fortipam-mcp-http"]
-    documents = [json.dumps([_image()]), json.dumps([http_container])]
+    documents = [
+        json.dumps([_image(entrypoint="fortipam-mcp-http")]),
+        json.dumps([http_container]),
+    ]
 
     def fake_run(command, **kwargs):
         return type("Completed", (), {"stdout": documents.pop(0)})()
@@ -144,7 +147,12 @@ def test_provenance_supports_http_entrypoint_and_rejects_unknown_readonly_mount(
     assert rejected["passed"] is False
     assert rejected["readonly_mounts_allowlisted"] is False
 
-    documents.extend([json.dumps([_image()]), json.dumps([http_container])])
+    documents.extend(
+        [
+            json.dumps([_image(entrypoint="fortipam-mcp-http")]),
+            json.dumps([http_container]),
+        ]
+    )
     accepted = provenance.verify_provenance(
         image="candidate",
         expected_image_id=IMAGE_ID,

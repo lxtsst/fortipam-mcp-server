@@ -10,7 +10,24 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
 import scripts.v4_registry as registry_module
+from fortipam_mcp.access_domain_projection_source import (
+    SOURCE_CONTRACT,
+    SOURCE_REF,
+    SOURCE_VERSION,
+    access_domain_projection_contract,
+)
+from fortipam_mcp.approval_and_observe_projection_source import (
+    SOURCE_REF as APPROVAL_AND_OBSERVE_SOURCE_REF,
+    approval_and_observe_projection_contract,
+)
+from fortipam_mcp.secret_onboarding_projection_source import (
+    SOURCE_CONTRACT as SECRET_ONBOARDING_SOURCE_CONTRACT,
+    SOURCE_REF as SECRET_ONBOARDING_SOURCE_REF,
+    SOURCE_VERSION as SECRET_ONBOARDING_SOURCE_VERSION,
+    secret_onboarding_projection_contract,
+)
 from scripts.v4_registry import RegistryValidationError, load_registry, validate_registry
+from v4_planning import ObjectClass
 
 
 REGISTRY_FILE = Path(__file__).parents[1] / "registry/v4_administrative_registry.json"
@@ -321,10 +338,14 @@ def test_scheme_source_provenance_must_equal_blueprint_union() -> None:
         validate_registry(broken)
 
 
-def test_m2_fake_only_evidence_can_promote_only_the_two_allowed_schemes() -> None:
+def test_m2_implementation_evidence_can_promote_only_the_allowed_schemes() -> None:
     registry = load_registry()
     promoted = copy.deepcopy(registry)
-    for scheme_id in ("AccessDomainScheme", "SecretOnboardingScheme"):
+    for scheme_id in (
+        "AccessDomainScheme",
+        "ApprovalAndObserveScheme",
+        "SecretOnboardingScheme",
+    ):
         scheme = next(item for item in promoted["schemes"] if item["id"] == scheme_id)
         scheme["status"] = "planned"
         scheme["maturity"] = "contract_tested"
@@ -333,30 +354,84 @@ def test_m2_fake_only_evidence_can_promote_only_the_two_allowed_schemes() -> Non
     validate_registry(promoted)
 
 
-def test_packaged_m2_promotion_is_exact_and_covers_wrapper_and_core_refs() -> None:
+def test_plan_runtime_promotion_is_exact_and_covers_runtime_refs() -> None:
     registry = load_registry()
     expected_modules = [
         "scripts/v4_planning.py",
+        "scripts/build_v4_plan_runtime.py",
         "v4_planning/canonical.py",
         "v4_planning/models.py",
         "v4_planning/engine.py",
+        "v4_planning/store.py",
+        "v4_planning/persistence.py",
+        "v4_planning/workflow_service.py",
+        "v4_planning/mcp_facade.py",
+        "v4_planning/runtime_profile.py",
         "v4_planning/__init__.py",
     ]
     for scheme in registry["schemes"]:
-        if scheme["id"] in {"AccessDomainScheme", "SecretOnboardingScheme"}:
+        if scheme["id"] in {
+            "BulkOnboardingScheme",
+            "AccessDomainScheme",
+            "ApprovalAndObserveScheme",
+            "IdentityLifecycleScheme",
+            "SecretOnboardingScheme",
+        }:
             assert scheme["status"] == "planned"
             assert scheme["maturity"] == "contract_tested"
             assert scheme["lifecycle"] == "contract_tested"
             evidence = scheme["implementation_evidence"]
             assert evidence["evidence_status"] == "contract_tested"
-            expected_profile = (
-                ["FPA-BP-004"]
-                if scheme["id"] == "AccessDomainScheme"
-                else ["FPA-BP-005"]
-            )
+            expected_profile = {
+                "BulkOnboardingScheme": ["FPA-BP-014"],
+                "AccessDomainScheme": ["FPA-BP-004"],
+                "ApprovalAndObserveScheme": ["FPA-BP-008"],
+                "IdentityLifecycleScheme": ["FPA-BP-015"],
+                "SecretOnboardingScheme": [
+                    "FPA-BP-005",
+                    "FPA-BP-006",
+                    "FPA-BP-007",
+                ],
+            }[scheme["id"]]
             assert evidence["profile_blueprint_refs"] == expected_profile
-            assert evidence["module_refs"] == expected_modules
-            assert evidence["test_refs"] == ["tests/test_v4_planning.py"]
+            source_modules = {
+                "BulkOnboardingScheme": registry_module.AD_DISCOVERY_SOURCE_MODULE_REFS,
+                "AccessDomainScheme": (
+                    registry_module.ACCESS_DOMAIN_SOURCE_MODULE_REFS
+                ),
+                "ApprovalAndObserveScheme": (
+                    registry_module.APPROVAL_AND_OBSERVE_SOURCE_MODULE_REFS
+                ),
+                "SecretOnboardingScheme": (
+                    registry_module.SECRET_ONBOARDING_SOURCE_MODULE_REFS
+                ),
+            }
+            source_tests = {
+                "BulkOnboardingScheme": registry_module.AD_DISCOVERY_SOURCE_TEST_REFS,
+                "AccessDomainScheme": (
+                    registry_module.ACCESS_DOMAIN_SOURCE_TEST_REFS
+                ),
+                "ApprovalAndObserveScheme": (
+                    registry_module.APPROVAL_AND_OBSERVE_SOURCE_TEST_REFS
+                ),
+                "SecretOnboardingScheme": (
+                    registry_module.SECRET_ONBOARDING_SOURCE_TEST_REFS
+                ),
+            }
+            if scheme["id"] in source_modules:
+                assert evidence["module_refs"] == source_modules[scheme["id"]]
+                assert evidence["test_refs"] == source_tests[scheme["id"]]
+            else:
+                assert evidence["module_refs"] == expected_modules
+                assert evidence["test_refs"] == [
+                    "tests/test_v4_planning.py",
+                    "tests/test_v4_m3.py",
+                    "tests/test_v4_persistence.py",
+                    "tests/test_v4_plan_runtime.py",
+                ]
+                assert evidence["evidence_kind"] == "fake_only_contract"
+                assert evidence["device_access"] is False
+                assert "projection_profile" not in evidence
         else:
             assert scheme["status"] == "design_only"
             assert scheme["maturity"] == "catalogued"
@@ -378,7 +453,7 @@ def test_m2_promotion_without_contract_tested_evidence_is_denied() -> None:
 def test_non_m2_scheme_cannot_promote_or_carry_evidence() -> None:
     registry = load_registry()
     broken = copy.deepcopy(registry)
-    scheme = next(item for item in broken["schemes"] if item["id"] == "IdentityLifecycleScheme")
+    scheme = next(item for item in broken["schemes"] if item["id"] == "IntegrationScheme")
     scheme["status"] = "planned"
     scheme["maturity"] = "contract_tested"
     scheme["lifecycle"] = "contract_tested"
@@ -386,18 +461,43 @@ def test_non_m2_scheme_cannot_promote_or_carry_evidence() -> None:
         validate_registry(broken)
 
 
+def test_identity_lifecycle_evidence_is_fake_only_and_restricted_to_bp015() -> None:
+    registry = load_registry()
+    scheme = next(
+        item for item in registry["schemes"] if item["id"] == "IdentityLifecycleScheme"
+    )
+    evidence = scheme["implementation_evidence"]
+
+    assert scheme["blueprint_refs"] == [
+        "FPA-BP-002",
+        "FPA-BP-003",
+        "FPA-BP-004",
+        "FPA-BP-014",
+        "FPA-BP-015",
+    ]
+    assert evidence["profile_blueprint_refs"] == ["FPA-BP-015"]
+    assert evidence["evidence_kind"] == "fake_only_contract"
+    assert evidence["device_access"] is False
+    assert evidence["dispatchable"] is False
+    assert evidence["executor_runtime_packaged"] is False
+    assert evidence["executor_mcp_exposed"] is False
+    assert "projection_profile" not in evidence
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
         ("dispatchable", True, "dispatchable must be false"),
-        ("runtime_packaged", True, "runtime_packaged must be false"),
-        ("mcp_exposed", True, "mcp_exposed must be false"),
-        ("device_access", True, "device_access must be false"),
+        ("executor_runtime_packaged", True, "executor_runtime_packaged must be false"),
+        ("executor_mcp_exposed", True, "executor_mcp_exposed must be false"),
+        ("planner_runtime_packaged", False, "planner_runtime_packaged must be true"),
+        ("planner_mcp_exposed", True, "planner_mcp_exposed must be false"),
+        ("device_access", False, "device_access is invalid"),
         ("module_refs", ["/absolute/path.py"], "restricted relative paths"),
         ("module_refs", ["scripts/v4_planning.py"], "restricted relative paths"),
     ],
 )
-def test_m2_evidence_cannot_claim_runtime_or_unbounded_refs(field: str, value: object, message: str) -> None:
+def test_m2_evidence_cannot_claim_execution_or_unbounded_refs(field: str, value: object, message: str) -> None:
     registry = load_registry()
     broken = copy.deepcopy(registry)
     evidence = next(item for item in broken["schemes"] if item["id"] == "AccessDomainScheme")["implementation_evidence"]
@@ -414,12 +514,116 @@ def test_m2_promotion_requires_all_referenced_evidence_files(
         validate_registry(load_registry(REGISTRY_FILE))
 
 
+def test_access_domain_source_projection_profile_matches_runtime_contract() -> None:
+    registry = load_registry()
+    scheme = next(
+        item for item in registry["schemes"] if item["id"] == "AccessDomainScheme"
+    )
+    evidence = scheme["implementation_evidence"]
+    profile = evidence["projection_profile"]
+
+    assert evidence["evidence_kind"] == "source_backed_projection_contract"
+    assert evidence["device_access"] is True
+    assert profile == registry_module.ACCESS_DOMAIN_PROJECTION_PROFILE
+    assert profile["contract_id"] == SOURCE_CONTRACT
+    assert profile["contract_version"] == SOURCE_VERSION
+    assert profile["source_ref"] == SOURCE_REF
+    assert profile["object_classes"] == ["PublicFolder", "AccessGrant"]
+    for object_class in (ObjectClass.PUBLIC_FOLDER, ObjectClass.ACCESS_GRANT):
+        contract = access_domain_projection_contract(object_class)
+        assert contract.contract_id == profile["contract_id"]
+        assert contract.version == profile["contract_version"]
+        assert contract.source_ref == profile["source_ref"]
+        assert contract.max_age_seconds == profile["max_age_seconds"]
+
+
+def test_access_domain_source_projection_profile_drift_is_denied() -> None:
+    broken = copy.deepcopy(load_registry())
+    scheme = next(
+        item for item in broken["schemes"] if item["id"] == "AccessDomainScheme"
+    )
+    scheme["implementation_evidence"]["projection_profile"][
+        "max_age_seconds"
+    ] = 301
+
+    with pytest.raises(
+        RegistryValidationError,
+        match="source-backed projection profile is invalid",
+    ):
+        validate_registry(broken)
+
+
+def test_secret_onboarding_source_projection_profile_matches_runtime_contract() -> None:
+    registry = load_registry()
+    scheme = next(
+        item
+        for item in registry["schemes"]
+        if item["id"] == "SecretOnboardingScheme"
+    )
+    evidence = scheme["implementation_evidence"]
+    profile = evidence["projection_profile"]
+
+    assert evidence["evidence_kind"] == "source_backed_projection_contract"
+    assert evidence["device_access"] is True
+    assert profile == registry_module.SECRET_ONBOARDING_PROJECTION_PROFILE
+    assert profile["contract_id"] == SECRET_ONBOARDING_SOURCE_CONTRACT
+    assert profile["contract_version"] == SECRET_ONBOARDING_SOURCE_VERSION
+    assert profile["source_ref"] == SECRET_ONBOARDING_SOURCE_REF
+    object_classes = (
+        ObjectClass.FOLDER_BINDING,
+        ObjectClass.TARGET,
+        ObjectClass.TEMPLATE_BINDING,
+        ObjectClass.SECRET_METADATA,
+        ObjectClass.WEB_SECRET_METADATA,
+        ObjectClass.LAUNCHER_BINDING,
+        ObjectClass.POLICY_BINDING,
+        ObjectClass.RDP_EVENT_FILTER_BINDING,
+    )
+    assert profile["object_classes"] == [item.value for item in object_classes]
+    for object_class in object_classes:
+        contract = secret_onboarding_projection_contract(object_class)
+        assert contract.contract_id == profile["contract_id"]
+        assert contract.version == profile["contract_version"]
+        assert contract.source_ref == profile["source_ref"]
+        assert contract.max_age_seconds == profile["max_age_seconds"]
+
+
+def test_approval_and_observe_source_projection_profile_matches_runtime_contract() -> None:
+    registry = load_registry()
+    scheme = next(
+        item
+        for item in registry["schemes"]
+        if item["id"] == "ApprovalAndObserveScheme"
+    )
+    evidence = scheme["implementation_evidence"]
+    profile = evidence["projection_profile"]
+
+    assert evidence["evidence_kind"] == "source_backed_projection_contract"
+    assert evidence["device_access"] is True
+    assert profile == registry_module.APPROVAL_AND_OBSERVE_PROJECTION_PROFILE
+    assert profile["source_ref"] == APPROVAL_AND_OBSERVE_SOURCE_REF
+    object_classes = (
+        ObjectClass.APPROVAL_PROFILE_BINDING,
+        ObjectClass.SECRET_APPROVAL_BINDING,
+    )
+    assert profile["object_classes"] == [item.value for item in object_classes]
+    for object_class in object_classes:
+        contract = approval_and_observe_projection_contract(object_class)
+        assert contract.contract_id == profile["contract_id"]
+        assert contract.version == profile["contract_version"]
+        assert contract.source_ref == profile["source_ref"]
+        assert contract.max_age_seconds == profile["max_age_seconds"]
+
+
 def test_m2_evidence_cannot_overclaim_an_untested_blueprint_profile() -> None:
     broken = copy.deepcopy(load_registry())
     scheme = next(
         item for item in broken["schemes"] if item["id"] == "SecretOnboardingScheme"
     )
-    scheme["implementation_evidence"]["profile_blueprint_refs"] = ["FPA-BP-006"]
+    scheme["implementation_evidence"]["profile_blueprint_refs"] = [
+        "FPA-BP-005",
+        "FPA-BP-007",
+    ]
     with pytest.raises(RegistryValidationError, match="unsupported M2 profile Blueprint"):
         validate_registry(broken)
 
@@ -454,3 +658,25 @@ def test_action_matrix_enablement_claim_is_denied(monkeypatch: pytest.MonkeyPatc
 
 def test_registry_file_is_valid_json() -> None:
     assert isinstance(json.loads(REGISTRY_FILE.read_text(encoding="utf-8")), dict)
+
+
+def test_existing_secret_controls_registry_matches_separate_source_contract() -> None:
+    from fortipam_mcp.secret_onboarding_projection_source import secret_onboarding_projection_contract
+    from v4_planning import ObjectClass
+
+    registry = load_registry()
+    scheme = next(item for item in registry["schemes"] if item["id"] == "SecretOnboardingScheme")
+    profile = scheme["implementation_evidence"]["projection_profile"]
+    contract = secret_onboarding_projection_contract(ObjectClass.SECRET_SESSION_CONTROLS_BINDING)
+    assert profile["additional_contracts"][0] == {
+        "contract_id": contract.contract_id,
+        "contract_version": contract.version,
+        "source_ref": contract.source_ref,
+        "object_classes": [ObjectClass.SECRET_SESSION_CONTROLS_BINDING.value],
+    }
+    web = secret_onboarding_projection_contract(ObjectClass.WEB_SECRET_SERVICE_BINDING)
+    assert profile["additional_contracts"][1] == {
+        "contract_id": web.contract_id, "contract_version": web.version,
+        "source_ref": web.source_ref,
+        "object_classes": [ObjectClass.WEB_SECRET_SERVICE_BINDING.value],
+    }

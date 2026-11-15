@@ -2,63 +2,82 @@
 
 [简体中文](README.zh-CN.md)
 
-An independently developed FortiPAM MCP server that gives AI clients fixed, minimized, and auditable capabilities for read-only posture checks, operational diagnostics, and controlled local simulation workflows.
+An independent, self-hosted MCP server for FortiPAM posture checks, operational
+diagnostics, administrative planning, and explicitly enabled controlled workflows.
 
-> This project is not an official Fortinet product and is not endorsed by Fortinet. Fortinet and FortiPAM are trademarks of their respective owners.
+**Version: 4.0.0b108 (Beta).** This is a pre-release, not a production certification.
+The previous source release remains available as [v3.1.3](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v3.1.3).
+
+This is not an official Fortinet product and is not endorsed by Fortinet.
+Fortinet and FortiPAM are trademarks of Fortinet, Inc.
 
 ## Capabilities
 
-- Read-only FortiPAM API checks and restricted SSH diagnostics by default;
-- fixed routes, bounded inputs, recursive redaction, and minimized outputs;
-- stdio and Streamable HTTP MCP transports;
-- embedded local OAuth or an external OAuth resource-server mode;
-- an optional `lab-simulated` profile that modifies only isolated local fixtures, never FortiPAM;
-- FortiPAM operational Skills, scenario catalogs, and automated tests.
+- Read-only API posture checks and fixed SSH diagnostics by default.
+- Offline API discovery, operational scenarios, and administrative planning.
+- Separate `readonly`, `lab-simulated`, `v4-plan-only`, and `v4-controlled` profiles.
+- Stdio and Streamable HTTP, with local OAuth or an external OAuth resource server.
+- Versioned action contracts, state-drift checks, bounded execution, minimized
+  readback, and tamper-evident local audit state for supported controlled workflows.
+- Client-neutral MCP Resources and Prompts, plus optional FortiPAM workflow Skills.
+
+The default profile exposes 28 read-only/offline tools. The authenticated HTTP
+`v4-plan-only` profile exposes 97 tools and cannot execute device changes.
+The `v4-controlled` profile registers only explicitly bound and individually
+enabled actions. All execution gates are closed by default.
 
 ## Install and verify
 
-Python 3.11 or 3.12 is required.
+Use Python 3.11 or 3.12 in a dedicated environment:
 
 ```bash
 git clone https://github.com/lxtsst/fortipam-mcp-server.git
 cd fortipam-mcp-server
+git checkout v4.0.0-beta.108
 python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt hatchling==1.32.0 -e '.[dev]'
 .venv/bin/python scripts/verify_release.py
 ```
 
-Start the stdio server:
+Start the default stdio server:
 
 ```bash
 .venv/bin/fortipam-mcp-server
 ```
 
-Start local Streamable HTTP:
+For a loopback-only HTTP server:
 
 ```bash
 FORTIPAM_MCP_HTTP_AUTH_MODE=none .venv/bin/fortipam-mcp-http
 ```
 
-Unauthenticated HTTP is restricted to loopback. Remote deployments require HTTPS and an appropriate OAuth configuration.
+Remote HTTP requires HTTPS and an appropriate OAuth configuration. See
+[deployment](docs/DEPLOYMENT.md), [profiles and compatibility](docs/COMPATIBILITY.md),
+and the [security model](docs/SECURITY_MODEL.md).
 
 ## Configuration
 
-The repository contains sanitized examples only:
+Use the sanitized [.env.example](.env.example) and
+[configuration example](config/fortipam.example.json).
+Keep real configuration in ignored, owner-only files. Supply your own authorized
+FortiPAM endpoint, CA trust, API identity, and any separately required SSH identity.
+Never commit credentials, tokens, private keys, device addresses, or customer data.
 
-- [`.env.example`](.env.example)
-- [`config/fortipam.example.json`](config/fortipam.example.json)
-- [`deploy/docker/fortipam-http.example.env`](deploy/docker/fortipam-http.example.env)
+## Limitations
 
-Never commit credentials, tokens, SSH private keys, device addresses, or customer data. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) and [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md) for deployment and trust boundaries.
+Action availability depends on the selected profile, explicit bindings, product
+version, and required identity and state. Code or catalog presence does not prove
+that a workflow is callable or qualified for a deployment. Service-account Target
+creation/recovery has unresolved outcomes and remains isolated; its update entry
+is not registered. HA, bulk import, Terraform, external identity/MFA, and native
+client or hardware-dependent scenarios have incomplete qualification.
+Do not retry an operation with an uncertain outcome before reconciling its state.
 
-## Repository layout
+## Contributing and license
 
-- `src/fortipam_mcp/`: MCP server implementation;
-- `plugins/fortipam-security-copilot/`: Codex plugin and FortiPAM Skills;
-- `registry/` and `schemas/`: controlled-operation and administration metadata;
-- `tests/` and `evals/`: automated tests and scenario evaluation;
-- `deploy/docker/`: Docker deployment assets.
-
-## Security and license
-
-Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md); do not include sensitive information in a public issue. Licensed under the [MIT License](LICENSE).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+The project is licensed under [MIT](LICENSE). The license does not grant rights
+to third-party API archives or vendor documentation. The repository contains
+implementation, bounded metadata, synthetic tests, and sanitized examples;
+it does not include shared credentials or a hosted FortiPAM service.
+See [privacy](PRIVACY.md) and [terms](TERMS.md).

@@ -54,6 +54,84 @@ LAB_ADMIN_TOOLS = (
     "execute_confirmed_v31_lab_operation",
 )
 LAB_EXPECTED_TOOLS = EXPECTED_TOOLS + LAB_ADMIN_TOOLS
+V4_PLAN_TOOLS = (
+    "preview_v4_administrative_intent",
+    "confirm_v4_administrative_intent",
+    "prepare_v4_non_executable_plan",
+    "get_v4_plan_status",
+    "get_v4_firmware_upgrade_plan_requirements",
+    "build_v4_firmware_upgrade_plan",
+    "get_v4_backup_create_plan_requirements",
+    "build_v4_backup_create_plan",
+    "get_v4_backup_restore_plan_requirements",
+    "build_v4_backup_restore_plan",
+    "get_v4_license_install_plan_requirements",
+    "build_v4_license_install_plan",
+    "get_v4_system_email_plan_requirements",
+    "build_v4_system_email_plan",
+    "get_v4_email_alert_plan_requirements",
+    "build_v4_email_alert_plan",
+    "get_v4_glass_break_plan_requirements",
+    "get_v4_route_plan_requirements",
+    "build_v4_route_plan",
+    "get_v4_dns_plan_requirements",
+    "build_v4_dns_plan",
+    "get_v4_ha_configure_plan_requirements",
+    "build_v4_ha_configure_plan",
+    "get_v4_ha_maintenance_plan_requirements",
+    "build_v4_ha_maintenance_plan",
+    "get_v4_ha_reconcile_plan_requirements",
+    "build_v4_ha_reconcile_plan",
+    "get_v4_certificate_import_plan_requirements",
+    "get_v4_crl_import_plan_requirements",
+    "get_v4_ldap_server_plan_requirements",
+    "get_v4_radius_server_plan_requirements",
+    "get_v4_saml_server_plan_requirements",
+    "get_v4_temporary_access_plan_requirements",
+    "get_v4_jwt_key_create_plan_requirements",
+    "get_v4_jwt_key_rotate_plan_requirements",
+    "get_v4_scim_client_create_plan_requirements",
+    "get_v4_scim_client_rotate_plan_requirements",
+    "get_v4_scim_client_disable_plan_requirements",
+    "get_v4_fortitoken_assign_plan_requirements",
+    "get_v4_fortitoken_revoke_plan_requirements",
+    "get_v4_apl_update_plan_requirements",
+    "get_v4_discovery_entry_create_plan_requirements",
+    "get_v4_discovery_run_plan_requirements",
+    "get_v4_discovery_review_plan_requirements",
+    "get_v4_job_create_plan_requirements",
+    "get_v4_job_execute_plan_requirements",
+    "get_v4_password_changer_create_plan_requirements",
+    "get_v4_password_verification_plan_requirements",
+    "get_v4_checkout_policy_plan_requirements",
+    "get_v4_jit_policy_plan_requirements",
+    "get_v4_service_account_update_plan_requirements",
+    "get_v4_instruction_profile_create_plan_requirements",
+    "get_v4_event_subscription_plan_requirements",
+    "get_v4_secret_bulk_import_plan_requirements",
+    "build_v4_secret_bulk_import_plan",
+    "get_v4_secret_bulk_import_apply_requirements",
+    "get_v4_launcher_clone_plan_requirements",
+    "get_v4_policy_assign_plan_requirements",
+    "get_v4_approval_delivery_plan_requirements",
+    "get_v4_fabric_connector_plan_requirements",
+    "get_v4_secret_gateway_chain_plan_requirements",
+    "get_v4_reverse_service_plan_requirements",
+    "get_v4_ztna_tag_create_plan_requirements",
+    "get_v4_ztna_tag_group_create_plan_requirements",
+    "get_v4_target_disable_plan_requirements",
+    "get_v4_secret_metadata_update_plan_requirements",
+    "get_v4_approval_profile_disable_plan_requirements",
+    "get_v4_secret_disable_contract_gap",
+    "get_v4_launcher_disable_contract_gap",
+)
+V4_EXPECTED_TOOLS = EXPECTED_TOOLS + V4_PLAN_TOOLS
+V4_CONTROLLED_TOOLS = (
+    "preview_v4_child_folder_create",
+    "confirm_v4_child_folder_create",
+    "execute_confirmed_v4_child_folder",
+)
+V4_CONTROLLED_EXPECTED_TOOLS = V4_EXPECTED_TOOLS + V4_CONTROLLED_TOOLS
 EXPECTED_RESOURCES = (
     "fortipam://v2.1/capabilities",
     "fortipam://v2.1/scenarios",
@@ -70,6 +148,8 @@ EXPECTED_PROMPTS = (
     "fortipam_ha_diagnostics_triage",
     "fortipam_baseline_drift_triage",
 )
+V4_EXPECTED_RESOURCES = EXPECTED_RESOURCES + ("fortipam://v4/plan-contracts",)
+V4_EXPECTED_PROMPTS = EXPECTED_PROMPTS + ("fortipam_v4_plan_only_workflow",)
 STRICT_NO_INPUT_TOOLS = frozenset(
     {
         "get_cli_ha_configuration_summary",
@@ -98,6 +178,8 @@ def expected_tools_for_profile(profile: RuntimeProfile) -> tuple[str, ...]:
 
     if profile is RuntimeProfile.LAB_SIMULATED:
         return LAB_EXPECTED_TOOLS
+    if profile in {RuntimeProfile.V4_PLAN_ONLY, RuntimeProfile.V4_CONTROLLED}:
+        raise RuntimeError("The V4 HTTP profile is unavailable over stdio.")
     return EXPECTED_TOOLS
 
 
@@ -165,10 +247,13 @@ async def _run_stdio_smoke(
     expected_tools: tuple[str, ...],
     runtime_profile: RuntimeProfile,
 ) -> StdioSmokeResult:
+    child_environment = {RUNTIME_PROFILE_ENV: runtime_profile.value}
+    if "PYTHONPATH" in os.environ:
+        child_environment["PYTHONPATH"] = os.environ["PYTHONPATH"]
     parameters = StdioServerParameters(
         command=command[0],
         args=command[1:],
-        env={RUNTIME_PROFILE_ENV: runtime_profile.value},
+        env=child_environment,
     )
     with open(os.devnull, "w", encoding="utf-8") as dependency_errors:
         async with stdio_client(parameters, errlog=dependency_errors) as (read, write):

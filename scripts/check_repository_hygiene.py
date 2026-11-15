@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import argparse
+from collections import Counter
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -53,6 +55,19 @@ ASSIGNMENT_PATTERN = re.compile(
 )
 
 
+class RepositoryHygieneError(RuntimeError):
+    """Report only aggregate finding classes, never matched paths or values."""
+
+    def __init__(self, finding_counts: Counter[str]) -> None:
+        payload = {
+            "finding_counts": dict(sorted(finding_counts.items())),
+            "matched_paths_reported": False,
+            "protected_values_reported": False,
+            "status": "failed",
+        }
+        super().__init__(json.dumps(payload, indent=2, sort_keys=True))
+
+
 def content_findings(content: bytes) -> set[str]:
     """Return rule identifiers without returning matched protected content."""
 
@@ -88,22 +103,24 @@ def path_findings(path: str) -> set[str]:
     return findings
 
 
-def _git_output(*arguments: str) -> bytes:
+def _git_output(project_root: Path, *arguments: str) -> bytes:
     return subprocess.run(
         ("git", *arguments),
-        cwd=PROJECT_ROOT,
+        cwd=project_root,
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     ).stdout
 
 
-def scan_repository() -> dict[str, object]:
+def scan_repository(project_root: Path = PROJECT_ROOT) -> dict[str, object]:
     """Scan tracked files and reachable history without printing matched values."""
 
+    project_root = project_root.resolve()
     paths = [
         item.decode("utf-8")
         for item in _git_output(
+            project_root,
             "ls-files",
             "-z",
             "--cached",
@@ -112,26 +129,29 @@ def scan_repository() -> dict[str, object]:
         ).split(b"\0")
         if item
     ]
-    findings: list[str] = []
+    findings: Counter[str] = Counter()
     for path in paths:
         for rule in sorted(path_findings(path)):
-            findings.append(f"working-tree:{path}:{rule}")
-        candidate = PROJECT_ROOT / path
+            findings[f"working-tree:{rule}"] += 1
+        candidate = project_root / path
         if not candidate.exists():
             continue
         if candidate.is_symlink():
-            findings.append(f"working-tree:{path}:symbolic-link")
+            findings["working-tree:symbolic-link"] += 1
             continue
         content = candidate.read_bytes()
         for rule in sorted(content_findings(content)):
-            findings.append(f"working-tree:{path}:{rule}")
+            findings[f"working-tree:{rule}"] += 1
 
-    history = _git_output("log", "--all", "--no-color", "--format=", "-p")
+    history = _git_output(
+        project_root, "log", "--all", "--no-color", "--format=", "-p"
+    )
     for rule in sorted(content_findings(history)):
-        findings.append(f"reachable-history:{rule}")
+        findings[f"reachable-history:{rule}"] += 1
     history_paths = {
         item.decode("utf-8", errors="replace")
         for item in _git_output(
+            project_root,
             "log",
             "--all",
             "--no-color",
@@ -143,11 +163,12 @@ def scan_repository() -> dict[str, object]:
     }
     for path in sorted(history_paths):
         for rule in sorted(path_findings(path)):
-            findings.append(f"reachable-history-path:{path}:{rule}")
+            findings[f"reachable-history-path:{rule}"] += 1
 
     if findings:
-        raise RuntimeError("Repository hygiene findings:\n" + "\n".join(findings))
+        raise RepositoryHygieneError(findings)
     return {
+        "matched_paths_reported": False,
         "status": "passed",
         "working_tree_file_count": len(paths),
         "reachable_history_scanned": True,
@@ -155,8 +176,23 @@ def scan_repository() -> dict[str, object]:
     }
 
 
-def main() -> None:
-    print(json.dumps(scan_repository(), indent=2, sort_keys=True))
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Scan one Git repository for protected-content indicators."
+    )
+    parser.add_argument(
+        "--repository",
+        type=Path,
+        default=PROJECT_ROOT,
+        help="Repository to scan; defaults to the project containing this script.",
+    )
+    args = parser.parse_args(argv)
+    try:
+        result = scan_repository(args.repository)
+    except RepositoryHygieneError as exc:
+        print(str(exc))
+        raise SystemExit(1) from None
+    print(json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

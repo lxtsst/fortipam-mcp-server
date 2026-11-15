@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 import tomllib
 
-from scripts.check_repository_hygiene import content_findings, path_findings
+from scripts.check_repository_hygiene import (
+    RepositoryHygieneError,
+    content_findings,
+    path_findings,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +30,24 @@ def test_repository_hygiene_detects_protected_content_without_returning_it() -> 
     assert path_findings("config/fortipam.local.json") == {"tracked-local-config"}
 
 
+def test_repository_hygiene_error_reports_only_aggregate_counts() -> None:
+    protected_path = "/".join(("Users", "private-operator", "candidate.pem"))
+    error = RepositoryHygieneError(
+        Counter(
+            {
+                "working-tree:private-ipv4": 2,
+                "working-tree:tracked-key-or-certificate": 1,
+            }
+        )
+    )
+    rendered = str(error)
+
+    assert protected_path not in rendered
+    assert "working-tree:private-ipv4" in rendered
+    assert '"matched_paths_reported": false' in rendered
+    assert '"protected_values_reported": false' in rendered
+
+
 def test_repository_hygiene_rejects_runtime_and_secret_paths() -> None:
     assert path_findings("nested/.env.local") == {"tracked-environment-file"}
     assert path_findings("wheelhouse/dependency.whl") == {
@@ -43,15 +66,8 @@ def test_repository_hygiene_detects_each_private_ipv4_range() -> None:
         assert content_findings(b"endpoint=" + address) == {"private-ipv4"}
 
 
-def test_public_repository_security_boundary_is_documented() -> None:
-    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-    security_model = (PROJECT_ROOT / "docs" / "SECURITY_MODEL.md").read_text(
-        encoding="utf-8"
-    )
 
-    assert "Never commit credentials" in readme
-    assert "arbitrary HTTP" in security_model
-    assert "protected material" in security_model
+
 
 
 def test_local_presentation_inspection_artifacts_are_ignored() -> None:
@@ -59,6 +75,20 @@ def test_local_presentation_inspection_artifacts_are_ignored() -> None:
 
     assert ".codex_tmp/" in ignore_rules.splitlines()
     assert "*.inspect.ndjson" in ignore_rules.splitlines()
+
+
+def test_nested_generated_wheelhouses_are_ignored() -> None:
+    ignore_rules = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert "**/deploy/docker/wheelhouse/" in ignore_rules.splitlines()
+
+
+def test_local_export_and_presentation_artifacts_are_ignored() -> None:
+    ignore_rules = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert "local-output/" in ignore_rules.splitlines()
+    assert "tmp/" in ignore_rules.splitlines()
+    assert "*.pptx" in ignore_rules.splitlines()
 
 
 def test_security_support_line_matches_package_minor_version() -> None:

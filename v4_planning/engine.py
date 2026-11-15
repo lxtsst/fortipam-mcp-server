@@ -1,15 +1,16 @@
-"""Repository-only V4 M2 Scheme compiler and comparison state machine.
+"""V4 plan-only Scheme compiler and comparison state machine.
 
-This module has no product client, MCP registration, credential loader,
-approval service, write adapter, or execution method.  It compiles two typed
-Scheme profiles into confirmed, explicitly non-dispatchable planning records.
+This module has no product client, credential loader, write adapter, or
+execution method. It compiles typed Scheme profiles into confirmed,
+explicitly non-dispatchable planning records. A separate pre-release facade may
+package and expose these planning transitions without exposing an executor.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import replace
-from typing import Mapping, Protocol, Sequence, cast
+from typing import Callable, Mapping, Protocol, Sequence, cast
 
 from .canonical import CanonicalValue, canonical_digest
 from .models import (
@@ -69,14 +70,37 @@ class ReferenceAuthorizer(Protocol):
     ) -> VerifiedReferenceDecision: ...
 
 
-_M2_SCHEMES = {SchemeId.ACCESS_DOMAIN.value, SchemeId.SECRET_ONBOARDING.value}
-_M2_PROFILE_BLUEPRINT = {
-    SchemeId.ACCESS_DOMAIN.value: "FPA-BP-004",
-    SchemeId.SECRET_ONBOARDING.value: "FPA-BP-005",
+_M2_SCHEMES = {
+    SchemeId.BULK_ONBOARDING.value,
+    SchemeId.ACCESS_DOMAIN.value,
+    SchemeId.APPROVAL_AND_OBSERVE.value,
+    SchemeId.IDENTITY_LIFECYCLE.value,
+    SchemeId.SECRET_ONBOARDING.value,
 }
-_M2_PROFILE_OUTCOME = {
-    SchemeId.ACCESS_DOMAIN.value: "establish_access_domain",
-    SchemeId.SECRET_ONBOARDING.value: "onboard_privileged_resource",
+_M2_PROFILE_BLUEPRINTS = {
+    SchemeId.BULK_ONBOARDING.value: ("FPA-BP-014",),
+    SchemeId.ACCESS_DOMAIN.value: ("FPA-BP-004",),
+    SchemeId.APPROVAL_AND_OBSERVE.value: ("FPA-BP-008",),
+    SchemeId.IDENTITY_LIFECYCLE.value: ("FPA-BP-015",),
+    SchemeId.SECRET_ONBOARDING.value: ("FPA-BP-005", "FPA-BP-006", "FPA-BP-007"),
+}
+_M2_PROFILE_OUTCOMES = {
+    (SchemeId.BULK_ONBOARDING.value, "FPA-BP-014"): "create_disabled_ad_discovery_source",
+    (SchemeId.ACCESS_DOMAIN.value, "FPA-BP-004"): "establish_access_domain",
+    (SchemeId.APPROVAL_AND_OBSERVE.value, "FPA-BP-008"): (
+        "require_interactive_approval"
+    ),
+    (SchemeId.IDENTITY_LIFECYCLE.value, "FPA-BP-015"): (
+        "manage_sponsored_group_membership"
+    ),
+    (SchemeId.SECRET_ONBOARDING.value, "FPA-BP-005"): (
+        "onboard_privileged_resource"
+    ),
+    (SchemeId.SECRET_ONBOARDING.value, "FPA-BP-006"): (
+        "onboard_windows_rdp_resource"
+    ),
+    (SchemeId.SECRET_ONBOARDING.value, "FPA-BP-007"): "onboard_web_account",
+    (SchemeId.SECRET_ONBOARDING.value, "FPA-BP-014"): "onboard_domain_account",
 }
 _ACCESS_CLASSES = {
     ObjectClass.PUBLIC_FOLDER,
@@ -89,22 +113,60 @@ _SECRET_CLASSES = {
     ObjectClass.TARGET,
     ObjectClass.TEMPLATE_BINDING,
     ObjectClass.SECRET_METADATA,
+    ObjectClass.WEB_SECRET_METADATA,
+    ObjectClass.WEB_TARGET_BINDING,
+    ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA,
+    ObjectClass.DOMAIN_TARGET_BINDING,
+    ObjectClass.DOMAIN_SECRET_METADATA,
+    ObjectClass.WINRM_COLLECTOR_METADATA,
     ObjectClass.LAUNCHER_BINDING,
     ObjectClass.POLICY_BINDING,
+    ObjectClass.RDP_EVENT_FILTER_BINDING,
+    ObjectClass.SECRET_SESSION_CONTROLS_BINDING,
+    ObjectClass.WEB_SECRET_SERVICE_BINDING,
 }
-_REQUIRED_SECRET_CLASSES = {
+_APPROVAL_CLASSES = {
+    ObjectClass.APPROVAL_PROFILE_BINDING,
+    ObjectClass.SECRET_APPROVAL_BINDING,
+}
+_IDENTITY_CLASSES = {
+    ObjectClass.SPONSORED_GROUP,
+    ObjectClass.SPONSORED_GROUP_MEMBER,
+}
+_REQUIRED_APPROVAL_CLASSES = _APPROVAL_CLASSES
+_REQUIRED_TARGET_SECRET_CLASSES = {
     ObjectClass.FOLDER_BINDING,
     ObjectClass.TARGET,
     ObjectClass.TEMPLATE_BINDING,
     ObjectClass.SECRET_METADATA,
 }
+_REQUIRED_WEB_SECRET_CLASSES = {
+    ObjectClass.FOLDER_BINDING,
+    ObjectClass.TEMPLATE_BINDING,
+    ObjectClass.WEB_SECRET_METADATA,
+}
+_REQUIRED_TARGET_BOUND_WEB_CLASSES = {
+    ObjectClass.FOLDER_BINDING, ObjectClass.WEB_TARGET_BINDING,
+    ObjectClass.TEMPLATE_BINDING, ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA,
+}
+_REQUIRED_DOMAIN_SECRET_CLASSES = {
+    ObjectClass.FOLDER_BINDING, ObjectClass.DOMAIN_TARGET_BINDING,
+    ObjectClass.TEMPLATE_BINDING, ObjectClass.DOMAIN_SECRET_METADATA,
+}
+_BULK_CLASSES = _REQUIRED_DOMAIN_SECRET_CLASSES | {ObjectClass.DISCOVERY_SOURCE_METADATA}
+_REQUIRED_WINRM_COLLECTOR_CLASSES = {
+    ObjectClass.FOLDER_BINDING, ObjectClass.TARGET, ObjectClass.TEMPLATE_BINDING,
+    ObjectClass.WINRM_COLLECTOR_METADATA,
+}
 _UNCHANGED_BOUNDARY = (
     "c3_material_excluded",
-    "device_state_unchanged_by_m2",
-    "mcp_tool_surface_unchanged",
+    "device_state_unchanged_by_planner",
+    "execution_tool_surface_unchanged",
+    "product_write_surface_unchanged",
     "v3_runtime_unchanged",
 )
 _DEPENDENCY_ORDER = {
+    ObjectClass.DISCOVERY_SOURCE_METADATA: 3,
     ObjectClass.PUBLIC_FOLDER: 0,
     ObjectClass.CLASSIFICATION_BINDING: 1,
     ObjectClass.FOLDER_POLICY_BINDING: 1,
@@ -113,8 +175,21 @@ _DEPENDENCY_ORDER = {
     ObjectClass.TARGET: 1,
     ObjectClass.TEMPLATE_BINDING: 1,
     ObjectClass.SECRET_METADATA: 2,
+    ObjectClass.WEB_SECRET_METADATA: 2,
+    ObjectClass.DOMAIN_TARGET_BINDING: 1,
+    ObjectClass.DOMAIN_SECRET_METADATA: 2,
+    ObjectClass.WEB_TARGET_BINDING: 1,
+    ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA: 2,
+    ObjectClass.WINRM_COLLECTOR_METADATA: 2,
     ObjectClass.LAUNCHER_BINDING: 3,
     ObjectClass.POLICY_BINDING: 3,
+    ObjectClass.RDP_EVENT_FILTER_BINDING: 4,
+    ObjectClass.SECRET_SESSION_CONTROLS_BINDING: 5,
+    ObjectClass.WEB_SECRET_SERVICE_BINDING: 3,
+    ObjectClass.APPROVAL_PROFILE_BINDING: 0,
+    ObjectClass.SECRET_APPROVAL_BINDING: 1,
+    ObjectClass.SPONSORED_GROUP: 0,
+    ObjectClass.SPONSORED_GROUP_MEMBER: 1,
 }
 
 
@@ -153,18 +228,57 @@ _FIELD_RULES: dict[ObjectClass, tuple[FieldRule, ...]] = {
         FieldRule("template_ref", FieldKind.REFERENCE),
         FieldRule("compatibility", FieldKind.ENUM, ("compatible", "unknown")),
     ),
+    # Account class is expressed by the source-backed Template binding and
+    # material lifecycle by MaterialReferenceMetadata. FortiPAM 1.9.1 exposes
+    # no independent Secret enabled/lifecycle fields; permission inheritance
+    # is the exact non-secret Secret property used for postcondition readback.
     ObjectClass.SECRET_METADATA: _rules(
-        FieldRule(
-            "account_type",
-            FieldKind.ENUM,
-            ("application", "database", "directory", "key_based", "local"),
-        ),
-        FieldRule("enabled", FieldKind.BOOLEAN),
-        FieldRule(
-            "lifecycle_class",
-            FieldKind.ENUM,
-            ("managed", "manual", "rotate_and_verify"),
-        ),
+        FieldRule("inherit_permission", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.WINRM_COLLECTOR_METADATA: _rules(
+        FieldRule("inherit_permission", FieldKind.BOOLEAN),
+        FieldRule("privileged_account", FieldKind.BOOLEAN),
+        FieldRule("owner_only_folder", FieldKind.BOOLEAN),
+        FieldRule("rdp_service_enabled", FieldKind.BOOLEAN),
+        FieldRule("recording_enabled", FieldKind.BOOLEAN),
+        FieldRule("rdp_event_filter_enabled", FieldKind.BOOLEAN),
+        FieldRule("rdp_event_filter_profile_matches", FieldKind.BOOLEAN),
+        FieldRule("non_rdp_services_disabled", FieldKind.BOOLEAN),
+        FieldRule("target_association_matches", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.DOMAIN_TARGET_BINDING: _rules(
+        FieldRule("profile_ref", FieldKind.REFERENCE),
+        FieldRule("target_relation_matches", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.DOMAIN_SECRET_METADATA: _rules(
+        FieldRule("inherit_permission", FieldKind.BOOLEAN),
+        FieldRule("non_privileged_account", FieldKind.BOOLEAN),
+        FieldRule("services_disabled", FieldKind.BOOLEAN),
+        FieldRule("target_association_matches", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.DISCOVERY_SOURCE_METADATA: _rules(
+        FieldRule("source_type", FieldKind.ENUM, ("active_directory",)),
+        FieldRule("account_discovery", FieldKind.BOOLEAN),
+        FieldRule("domain_secret_ref", FieldKind.REFERENCE),
+        FieldRule("periodic_scanning_disabled", FieldKind.BOOLEAN),
+        FieldRule("auto_onboarding_disabled", FieldKind.BOOLEAN),
+        FieldRule("existing_secret_method", FieldKind.BOOLEAN),
+        FieldRule("no_scan_timestamp", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.WEB_TARGET_BINDING: _rules(
+        FieldRule("profile_ref", FieldKind.REFERENCE),
+        FieldRule("target_relation_matches", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA: _rules(
+        FieldRule("inherit_permission", FieldKind.BOOLEAN),
+        FieldRule("session_recording", FieldKind.BOOLEAN),
+        FieldRule("http_service_enabled", FieldKind.BOOLEAN),
+        FieldRule("proxy_mode_enabled", FieldKind.BOOLEAN),
+        FieldRule("target_association_matches", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.WEB_SECRET_METADATA: _rules(
+        FieldRule("inherit_permission", FieldKind.BOOLEAN),
+        FieldRule("session_recording", FieldKind.BOOLEAN),
     ),
     ObjectClass.LAUNCHER_BINDING: _rules(
         FieldRule("launcher_profile_ref", FieldKind.REFERENCE),
@@ -172,11 +286,47 @@ _FIELD_RULES: dict[ObjectClass, tuple[FieldRule, ...]] = {
     ObjectClass.POLICY_BINDING: _rules(
         FieldRule("policy_profile_ref", FieldKind.REFERENCE),
     ),
+    ObjectClass.RDP_EVENT_FILTER_BINDING: _rules(
+        FieldRule("profile_ref", FieldKind.REFERENCE),
+    ),
+    ObjectClass.SECRET_SESSION_CONTROLS_BINDING: _rules(
+        FieldRule("recording_enabled", FieldKind.BOOLEAN),
+        FieldRule("clipboard_blocking_enabled", FieldKind.BOOLEAN),
+        FieldRule("rdp_event_filter_enabled", FieldKind.BOOLEAN),
+        FieldRule("rdp_event_filter_profile_matches", FieldKind.BOOLEAN),
+        FieldRule("preserved_identity_digest", FieldKind.DIGEST),
+        FieldRule("event_filter_profile_digest", FieldKind.DIGEST),
+        FieldRule("profile_ref", FieldKind.REFERENCE),
+    ),
+    ObjectClass.WEB_SECRET_SERVICE_BINDING: _rules(
+        FieldRule("http_service_enabled", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.APPROVAL_PROFILE_BINDING: _rules(
+        FieldRule("profile_ref", FieldKind.REFERENCE),
+        FieldRule("profile_mode", FieldKind.ENUM, ("single_tier",)),
+    ),
+    ObjectClass.SECRET_APPROVAL_BINDING: _rules(
+        FieldRule("approval_profile_attached", FieldKind.BOOLEAN),
+        FieldRule("interactive_approval_required", FieldKind.BOOLEAN),
+        FieldRule("job_approval_required", FieldKind.BOOLEAN),
+        FieldRule("owner_bypass_allowed", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.SPONSORED_GROUP: _rules(
+        FieldRule("sponsor_admin_ref", FieldKind.REFERENCE),
+        FieldRule("maximum_members", FieldKind.POSITIVE_INTEGER),
+        FieldRule("sponsor_admin_scope_enforced", FieldKind.BOOLEAN),
+    ),
+    ObjectClass.SPONSORED_GROUP_MEMBER: _rules(
+        FieldRule("sponsored_group_ref", FieldKind.REFERENCE),
+        FieldRule("member_ref", FieldKind.REFERENCE),
+        FieldRule("schedule_ref", FieldKind.REFERENCE),
+        FieldRule("membership_status", FieldKind.ENUM, ("active", "disabled")),
+    ),
 }
 
 
 class M2RegistryView:
-    """Minimized registry view that proves M2 remains fake-only."""
+    """Minimized registry view for closed fake or registered read profiles."""
 
     def __init__(self, registry: Mapping[str, object]) -> None:
         if registry.get("registry_kind") != "fortipam_v4_administrative_registry":
@@ -193,32 +343,71 @@ class M2RegistryView:
             if scheme is None:
                 raise PlanningDenied("An M2 Scheme is absent from the registry.")
             evidence = scheme.get("implementation_evidence")
+            evidence_kind = (
+                evidence.get("evidence_kind")
+                if isinstance(evidence, Mapping)
+                else None
+            )
             if (
                 scheme.get("status") != "planned"
                 or scheme.get("maturity") != "contract_tested"
                 or scheme.get("lifecycle") != "contract_tested"
                 or not isinstance(evidence, Mapping)
                 or evidence.get("evidence_status") != "contract_tested"
-                or evidence.get("evidence_kind") != "fake_only_contract"
+                or evidence_kind
+                not in {"fake_only_contract", "source_backed_projection_contract"}
                 or evidence.get("profile_blueprint_refs")
-                != [_M2_PROFILE_BLUEPRINT[scheme_id]]
+                != list(_M2_PROFILE_BLUEPRINTS[scheme_id])
             ):
                 raise PlanningDenied("The M2 Scheme is not contract-tested.")
-            for capability in ("dispatchable", "runtime_packaged", "mcp_exposed", "device_access"):
+            for capability in (
+                "dispatchable",
+                "executor_runtime_packaged",
+                "executor_mcp_exposed",
+            ):
                 if evidence.get(capability) is not False:
-                    raise PlanningDenied("M2 implementation evidence claims runtime authority.")
+                    raise PlanningDenied("Planning evidence claims execution authority.")
+            source_profile = evidence.get("projection_profile")
+            if evidence_kind == "source_backed_projection_contract":
+                if (
+                    evidence.get("device_access") is not True
+                    or not isinstance(source_profile, Mapping)
+                    or source_profile.get("read_only") is not True
+                    or source_profile.get("raw_responses_returned") is not False
+                    or source_profile.get("product_selectors_returned") is not False
+                ):
+                    raise PlanningDenied(
+                        "Planning source-backed evidence is not safely registered."
+                    )
+            elif (
+                evidence.get("device_access") is not False
+                or source_profile is not None
+            ):
+                raise PlanningDenied("Fake-only planning evidence is invalid.")
+            if evidence.get("planner_runtime_packaged") is not True:
+                raise PlanningDenied("Planning package evidence is incomplete.")
+            if evidence.get("planner_mcp_exposed") is not False:
+                raise PlanningDenied("Planning evidence overstates MCP exposure.")
 
-    def resolve(self, draft: SchemeDraft) -> tuple[str, str, str]:
+    def resolve(
+        self, draft: SchemeDraft, *, approval_restore_profile_enabled: bool = False,
+    ) -> tuple[str, str, str]:
         scheme = self._schemes.get(draft.scheme_id.value)
         if scheme is None or scheme.get("version") != draft.scheme_version:
             raise PlanningDenied("Scheme version is not registered.")
         if draft.registry_schema_version != self.schema_version:
             raise PlanningDenied("Scheme uses a different registry schema version.")
-        if (
-            draft.blueprint_ref != _M2_PROFILE_BLUEPRINT[draft.scheme_id.value]
-            or draft.outcome_code != _M2_PROFILE_OUTCOME[draft.scheme_id.value]
-        ):
-            raise PlanningDenied("Scheme is outside the exact fake-only M2 profile.")
+        expected_outcome = _M2_PROFILE_OUTCOMES.get(
+            (draft.scheme_id.value, draft.blueprint_ref)
+        )
+        owned_restore = (
+            approval_restore_profile_enabled is True
+            and draft.scheme_id is SchemeId.APPROVAL_AND_OBSERVE
+            and draft.blueprint_ref == "FPA-BP-008"
+            and draft.outcome_code == "restore_owned_original_approval"
+        )
+        if expected_outcome is None or (draft.outcome_code != expected_outcome and not owned_restore):
+            raise PlanningDenied("Scheme is outside the exact registered M2 profile.")
         blueprint_refs = _string_tuple(scheme.get("blueprint_refs"))
         if draft.blueprint_ref not in blueprint_refs:
             raise PlanningDenied("Blueprint is not bound to the selected Scheme.")
@@ -256,11 +445,24 @@ class M2PlanningEngine:
         registry: Mapping[str, object],
         issuer: ReferenceIssuer,
         reference_authorizer: ReferenceAuthorizer,
+        *,
+        planner_mcp_exposed: bool = False,
+        projection_contract_resolver: (
+            Callable[[SchemeId, ObjectClass], ProjectionContract] | None
+        ) = None,
+        approval_restore_profile_enabled: bool = False,
     ) -> None:
         self._registry = M2RegistryView(registry)
         self._issuer = issuer
         self._reference_authorizer = reference_authorizer
         require_ref(reference_authorizer.authority_ref, "reference authority_ref")
+        if type(planner_mcp_exposed) is not bool:
+            raise PlanningDenied("Planner exposure metadata is invalid.")
+        self._planner_mcp_exposed = planner_mcp_exposed
+        self._projection_contract_resolver = projection_contract_resolver
+        if type(approval_restore_profile_enabled) is not bool:
+            raise PlanningDenied("Approval restoration profile setting is invalid.")
+        self._approval_restore_profile_enabled = approval_restore_profile_enabled
         self._summaries: dict[str, FinalIntentSummary] = {}
         self._confirmations: dict[str, ConfirmationRecord] = {}
         self._plans: dict[str, PreparedPlan] = {}
@@ -270,15 +472,47 @@ class M2PlanningEngine:
         self._prewrite_matches: dict[str, tuple[int, str]] = {}
         self._postwrite_evaluated_at: dict[str, int] = {}
 
-    @staticmethod
-    def projection_contract(scheme_id: SchemeId, object_class: ObjectClass) -> ProjectionContract:
-        allowed = _ACCESS_CLASSES if scheme_id is SchemeId.ACCESS_DOMAIN else _SECRET_CLASSES
+    def projection_contract(
+        self,
+        scheme_id: SchemeId,
+        object_class: ObjectClass,
+    ) -> ProjectionContract:
+        allowed = (
+            _BULK_CLASSES
+            if scheme_id is SchemeId.BULK_ONBOARDING
+            else
+            _ACCESS_CLASSES
+            if scheme_id is SchemeId.ACCESS_DOMAIN
+            else _APPROVAL_CLASSES
+            if scheme_id is SchemeId.APPROVAL_AND_OBSERVE
+            else _IDENTITY_CLASSES
+            if scheme_id is SchemeId.IDENTITY_LIFECYCLE
+            else _SECRET_CLASSES | _ACCESS_CLASSES
+        )
         if object_class not in allowed:
             raise PlanningDenied("Object class is not allowed for the Scheme.")
+        if self._projection_contract_resolver is not None:
+            try:
+                contract = self._projection_contract_resolver(scheme_id, object_class)
+            except PlanningContractError:
+                raise
+            except Exception as exc:
+                raise PlanningDenied("Projection contract is unavailable.") from exc
+            if (
+                not isinstance(contract, ProjectionContract)
+                or contract.object_class is not object_class
+            ):
+                raise PlanningDenied("Projection contract does not match the Scheme object.")
+            return contract
         contract_id = (
             "access-domain-state-v1"
-            if scheme_id is SchemeId.ACCESS_DOMAIN
-            else "secret-onboarding-state-v1"
+            if object_class in _ACCESS_CLASSES
+            else {
+                SchemeId.APPROVAL_AND_OBSERVE: "approval-and-observe-state-v1",
+                SchemeId.IDENTITY_LIFECYCLE: "identity-lifecycle-state-v1",
+                SchemeId.SECRET_ONBOARDING: "secret-onboarding-state-v1",
+                SchemeId.BULK_ONBOARDING: "ad-discovery-source-state-v1",
+            }[scheme_id]
         )
         return ProjectionContract(
             contract_id=contract_id,
@@ -300,7 +534,9 @@ class M2PlanningEngine:
     ) -> FinalIntentSummary:
         """Compile a versioned human-readable comparison without side effects."""
 
-        action_ref, action_version, risk_tier = self._registry.resolve(draft)
+        action_ref, action_version, risk_tier = self._registry.resolve(
+            draft, approval_restore_profile_enabled=self._approval_restore_profile_enabled,
+        )
         self._validate_draft(draft, risk_tier)
         projection_by_ref = {item.object_ref: item for item in projections}
         if len(projection_by_ref) != len(projections):
@@ -334,7 +570,7 @@ class M2PlanningEngine:
                 {"exists": desired.desired_exists, **desired_values}, complete=True
             )
             current_values = projection.values
-            expected_values: dict[str, bool | str] = {
+            expected_values: dict[str, bool | str | int] = {
                 "exists": desired.desired_exists,
                 **desired_values,
             }
@@ -371,6 +607,80 @@ class M2PlanningEngine:
                     fresh_until=projection.fresh_until,
                 )
             )
+
+        if draft.scheme_id is SchemeId.BULK_ONBOARDING and any(
+            (change.change_kind not in {ChangeKind.CREATE, ChangeKind.NO_OP}
+             if change.object_class is ObjectClass.DISCOVERY_SOURCE_METADATA
+             else change.change_kind is not ChangeKind.NO_OP)
+            for change in changes
+        ):
+            raise PlanningDenied("AD Source create requires unchanged existing dependencies.")
+
+        if draft.scheme_id is SchemeId.SECRET_ONBOARDING and any(item.object_class is ObjectClass.DOMAIN_SECRET_METADATA for item in draft.desired_objects) and any(
+            (change.change_kind not in {ChangeKind.CREATE, ChangeKind.NO_OP}
+             if change.object_class is ObjectClass.DOMAIN_SECRET_METADATA
+             else change.change_kind is not ChangeKind.NO_OP)
+            for change in changes
+        ):
+            raise PlanningDenied("Domain create requires unchanged existing dependencies.")
+
+        if any(
+            item.object_class is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA
+            for item in draft.desired_objects
+        ) and any(
+            (change.change_kind not in {ChangeKind.CREATE, ChangeKind.NO_OP}
+             if change.object_class is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA
+             else change.change_kind is not ChangeKind.NO_OP)
+            for change in changes
+        ):
+            raise PlanningDenied(
+                "Target-bound Web create requires unchanged existing dependencies."
+            )
+
+        if any(
+            item.object_class is ObjectClass.WINRM_COLLECTOR_METADATA
+            for item in draft.desired_objects
+        ) and any(
+            (change.change_kind not in {ChangeKind.CREATE, ChangeKind.NO_OP}
+             if change.object_class is ObjectClass.WINRM_COLLECTOR_METADATA
+             else change.change_kind is not ChangeKind.NO_OP)
+            for change in changes
+        ):
+            raise PlanningDenied("WinRM collector requires unchanged existing relations and no privilege conversion.")
+
+        if any(
+            item.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING
+            for item in draft.desired_objects
+        ) and any(
+            change.change_kind not in {ChangeKind.UPDATE, ChangeKind.NO_OP}
+            or (
+                change.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING
+                and "preserved_identity_digest" in dict(change.proposed_fields)
+            )
+            or (
+                change.object_class is not ObjectClass.SECRET_SESSION_CONTROLS_BINDING
+                and change.change_kind is not ChangeKind.NO_OP
+            )
+            for change in changes
+        ):
+            raise PlanningDenied("Existing Secret controls require preserved existing relations.")
+
+        if any(
+            item.object_class is ObjectClass.WEB_SECRET_SERVICE_BINDING
+            for item in draft.desired_objects
+        ) and any(
+            change.change_kind not in {ChangeKind.UPDATE, ChangeKind.NO_OP}
+            or (
+                change.object_class is ObjectClass.WEB_SECRET_SERVICE_BINDING
+                and "http_service_enabled" not in dict(change.proposed_fields)
+            )
+            or (
+                change.object_class is not ObjectClass.WEB_SECRET_SERVICE_BINDING
+                and change.change_kind is not ChangeKind.NO_OP
+            )
+            for change in changes
+        ):
+            raise PlanningDenied("Existing Web Secret service requires preserved existing relations.")
 
         current_digest = canonical_digest(
             [change.current_projection_digest for change in changes]
@@ -548,6 +858,89 @@ class M2PlanningEngine:
         self._summaries[summary_ref] = replace(summary, state=SummaryState.CONFIRMED)
         return record
 
+    def recover_awaiting_summary(self, summary: FinalIntentSummary) -> None:
+        """Restore one HMAC-verified, unconsumed summary after a process restart.
+
+        This only reconstructs transient planner state.  The caller remains
+        responsible for obtaining the record from a protected store; this
+        method neither reads storage nor changes a product.
+        """
+
+        if summary.state is not SummaryState.AWAITING_CONFIRMATION:
+            raise PlanningDenied("Only an unconsumed summary can be recovered.")
+        existing = self._summaries.get(summary.summary_ref)
+        if existing is not None and (
+            existing.revision != summary.revision
+            or existing.summary_digest != summary.summary_digest
+        ):
+            raise PlanningDenied("Recovered summary conflicts with planner state.")
+        self._summaries[summary.summary_ref] = summary
+        self._issued_refs.add(summary.summary_ref)
+        for confirmation_ref, record in tuple(self._confirmations.items()):
+            if record.summary_ref == summary.summary_ref:
+                del self._confirmations[confirmation_ref]
+                self._used_nonce_digests.discard(record.nonce_digest)
+        for plan_ref, plan in tuple(self._plans.items()):
+            if plan.summary_ref == summary.summary_ref:
+                del self._plans[plan_ref]
+                self._used_confirmation_refs.discard(plan.confirmation_ref)
+
+    def recover_confirmed_chain(
+        self,
+        summary: FinalIntentSummary,
+        confirmation: ConfirmationRecord,
+    ) -> None:
+        """Restore one exact persisted Summary -> Confirmation chain."""
+
+        self.recover_awaiting_summary(summary)
+        if (
+            confirmation.requester_digest != summary.requester_digest
+            or confirmation.audience_ref != summary.audience_ref
+            or confirmation.summary_ref != summary.summary_ref
+            or confirmation.summary_revision != summary.revision
+            or confirmation.summary_digest != summary.summary_digest
+            or confirmation.confirmed_at < summary.created_at
+            or confirmation.expires_at > summary.expires_at
+        ):
+            raise PlanningDenied("Recovered confirmation is not bound to its summary.")
+        self._confirmations[confirmation.confirmation_ref] = confirmation
+        self._used_nonce_digests.add(confirmation.nonce_digest)
+        self._issued_refs.add(confirmation.confirmation_ref)
+        self._summaries[summary.summary_ref] = replace(
+            summary,
+            state=SummaryState.CONFIRMED,
+        )
+
+    def recover_prepared_chain(
+        self,
+        summary: FinalIntentSummary,
+        confirmation: ConfirmationRecord,
+        plan: PreparedPlan,
+    ) -> None:
+        """Restore one exact persisted Summary -> Confirmation -> Plan chain."""
+
+        self.recover_confirmed_chain(summary, confirmation)
+        if (
+            plan.state is not PlanState.PREPARED_NON_EXECUTABLE
+            or plan.summary_ref != summary.summary_ref
+            or plan.summary_revision != summary.revision
+            or plan.summary_digest != summary.summary_digest
+            or plan.confirmation_ref != confirmation.confirmation_ref
+            or plan.confirmation_digest != confirmation.record_digest
+            or plan.requester_digest != summary.requester_digest
+            or plan.created_at < confirmation.confirmed_at
+            or plan.expires_at > confirmation.expires_at
+            or plan.dispatchable
+            or plan.adapter_registry_bound
+            or plan.executor_runtime_packaged
+            or plan.executor_mcp_exposed
+        ):
+            raise PlanningDenied("Recovered plan is not bound to its confirmation chain.")
+        self._plans[plan.plan_ref] = plan
+        self._used_confirmation_refs.add(plan.confirmation_ref)
+        self._issued_refs.add(plan.plan_ref)
+        self._issued_refs.update(line.line_ref for line in plan.lines)
+
     def prepare_plan(
         self,
         summary_ref: str,
@@ -587,9 +980,7 @@ class M2PlanningEngine:
             summary.material_reference_metadata.lifecycle != "available"
         ):
             raise PlanningDenied("Material availability metadata is not ready.")
-        mutable_changes = [
-            change for change in summary.object_changes if change.change_kind is not ChangeKind.NO_OP
-        ]
+        mutable_changes = _mutable_plan_changes(summary)
         if not mutable_changes:
             raise PlanningDenied("A no-op summary cannot produce a prepared plan.")
 
@@ -654,9 +1045,16 @@ class M2PlanningEngine:
             lines=tuple(lines),
             dispatchable=False,
             adapter_registry_bound=False,
-            runtime_packaged=False,
-            mcp_exposed=False,
-            plan_digest=canonical_digest(plan_content),
+            planner_runtime_packaged=True,
+            planner_mcp_exposed=self._planner_mcp_exposed,
+            executor_runtime_packaged=False,
+            executor_mcp_exposed=False,
+            plan_digest=canonical_digest(
+                {
+                    **plan_content,
+                    "planner_mcp_exposed": self._planner_mcp_exposed,
+                }
+            ),
         )
         self._used_confirmation_refs.add(confirmation_ref)
         self._plans[plan_ref] = plan
@@ -681,7 +1079,11 @@ class M2PlanningEngine:
             self._validate_projection_references(summary, projections, now_epoch)
             projection_by_ref = _projection_map(projections, summary.object_changes)
             observed = _current_aggregate(
-                summary.scheme_id, summary.object_changes, projection_by_ref, now_epoch
+                summary.scheme_id,
+                summary.object_changes,
+                projection_by_ref,
+                now_epoch,
+                self.projection_contract,
             )
         except PlanningContractError:
             self._invalidate_summary(plan.summary_ref)
@@ -789,7 +1191,29 @@ class M2PlanningEngine:
         if draft.risk_class != registered_risk:
             raise PlanningDenied("Scheme risk does not match its action-family placeholder.")
         classes = [item.object_class for item in draft.desired_objects]
-        if draft.scheme_id is SchemeId.ACCESS_DOMAIN:
+        if draft.scheme_id is SchemeId.BULK_ONBOARDING:
+            if (draft.blueprint_ref != "FPA-BP-014"
+                or draft.outcome_code != "create_disabled_ad_discovery_source"
+                or len(classes) != 5 or set(classes) != _BULK_CLASSES
+                or not all(item.desired_exists for item in draft.desired_objects)
+                or draft.material_reference_metadata is not None):
+                raise PlanningDenied("AD Source intent requires the isolated five-object profile.")
+            by_class = {item.object_class: item for item in draft.desired_objects}
+            expected_source = {
+                "source_type": "active_directory", "account_discovery": True,
+                "domain_secret_ref": by_class[ObjectClass.DOMAIN_SECRET_METADATA].object_ref,
+                "periodic_scanning_disabled": True, "auto_onboarding_disabled": True,
+                "existing_secret_method": True, "no_scan_timestamp": True,
+            }
+            if (dict(by_class[ObjectClass.DISCOVERY_SOURCE_METADATA].desired_fields) != expected_source
+                or dict(by_class[ObjectClass.DOMAIN_SECRET_METADATA].desired_fields) != {
+                    "inherit_permission": True, "non_privileged_account": True,
+                    "services_disabled": True, "target_association_matches": True,
+                }
+                or dict(by_class[ObjectClass.DOMAIN_TARGET_BINDING].desired_fields).get("target_relation_matches") is not True
+                or dict(by_class[ObjectClass.TEMPLATE_BINDING].desired_fields).get("compatibility") != "compatible"):
+                raise PlanningDenied("AD Source dependency or disabled-state intent is invalid.")
+        elif draft.scheme_id is SchemeId.ACCESS_DOMAIN:
             if set(classes) - _ACCESS_CLASSES or classes.count(ObjectClass.PUBLIC_FOLDER) != 1:
                 raise PlanningDenied("AccessDomainScheme object shape is invalid.")
             if draft.material_reference_metadata is not None:
@@ -818,15 +1242,162 @@ class M2PlanningEngine:
                 or classes.count(ObjectClass.FOLDER_POLICY_BINDING) > 1
             ):
                 raise PlanningDenied("AccessDomainScheme cardinality is invalid.")
-        else:
-            if set(classes) - _SECRET_CLASSES or not _REQUIRED_SECRET_CLASSES.issubset(classes):
+        elif draft.scheme_id is SchemeId.SECRET_ONBOARDING:
+            access_classes = [item for item in classes if item in _ACCESS_CLASSES]
+            if access_classes:
+                if (
+                    draft.blueprint_ref != "FPA-BP-005"
+                    or set(access_classes)
+                    - {ObjectClass.PUBLIC_FOLDER, ObjectClass.ACCESS_GRANT}
+                    or access_classes.count(ObjectClass.PUBLIC_FOLDER) != 1
+                    or not 1 <= access_classes.count(ObjectClass.ACCESS_GRANT) <= 12
+                ):
+                    raise PlanningDenied(
+                        "Composite Linux onboarding access shape is invalid."
+                    )
+                public_folder = next(
+                    item
+                    for item in draft.desired_objects
+                    if item.object_class is ObjectClass.PUBLIC_FOLDER
+                )
+                if not public_folder.desired_exists:
+                    raise PlanningDenied(
+                        "Composite Linux onboarding requires an existing access domain."
+                    )
+                grant_relations = [
+                    (
+                        dict(item.desired_fields).get("subject_class"),
+                        dict(item.desired_fields).get("subject_ref"),
+                    )
+                    for item in draft.desired_objects
+                    if item.object_class is ObjectClass.ACCESS_GRANT
+                    and item.desired_exists
+                ]
+                if (
+                    len(grant_relations) != len(set(grant_relations))
+                    or len(grant_relations)
+                    != access_classes.count(ObjectClass.ACCESS_GRANT)
+                ):
+                    raise PlanningDenied(
+                        "Composite Linux onboarding ACL relations are invalid."
+                    )
+            domain = next(
+                (item for item in draft.desired_objects
+                 if item.object_class is ObjectClass.DOMAIN_SECRET_METADATA), None,
+            )
+            if domain is not None:
+                domain_target = next(
+                    (item for item in draft.desired_objects
+                     if item.object_class is ObjectClass.DOMAIN_TARGET_BINDING), None,
+                )
+                if (
+                    draft.blueprint_ref != "FPA-BP-014"
+                    or draft.outcome_code != "onboard_domain_account"
+                    or set(classes) != _REQUIRED_DOMAIN_SECRET_CLASSES
+                    or not all(item.desired_exists for item in draft.desired_objects)
+                    or domain_target is None
+                    or dict(domain_target.desired_fields).get("target_relation_matches") is not True
+                    or dict(domain.desired_fields) != {
+                        "inherit_permission": True,
+                        "non_privileged_account": True,
+                        "services_disabled": True,
+                        "target_association_matches": True,
+                    }
+                ):
+                    raise PlanningDenied("Domain intent must use the isolated fixed profile.")
+            elif ObjectClass.DOMAIN_TARGET_BINDING in classes or draft.blueprint_ref == "FPA-BP-014":
+                raise PlanningDenied("Domain Target binding requires the Domain profile.")
+            bound_web = next(
+                (item for item in draft.desired_objects
+                 if item.object_class is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA),
+                None,
+            )
+            if bound_web is not None:
+                web_target = next(
+                    (item for item in draft.desired_objects
+                     if item.object_class is ObjectClass.WEB_TARGET_BINDING), None,
+                )
+                if (
+                    draft.blueprint_ref != "FPA-BP-007"
+                    or draft.outcome_code != "onboard_web_account"
+                    or set(classes) != _REQUIRED_TARGET_BOUND_WEB_CLASSES
+                    or not all(item.desired_exists for item in draft.desired_objects)
+                    or web_target is None
+                    or dict(web_target.desired_fields).get("target_relation_matches") is not True
+                    or dict(bound_web.desired_fields) != {
+                        "inherit_permission": True,
+                        "session_recording": True,
+                        "http_service_enabled": True,
+                        "proxy_mode_enabled": True,
+                        "target_association_matches": True,
+                    }
+                ):
+                    raise PlanningDenied("Target-bound Web intent must use the fixed profile.")
+            elif ObjectClass.WEB_TARGET_BINDING in classes:
+                raise PlanningDenied("Web Target binding requires the target-bound profile.")
+            collector = next(
+                (item for item in draft.desired_objects
+                 if item.object_class is ObjectClass.WINRM_COLLECTOR_METADATA),
+                None,
+            )
+            if collector is not None:
+                target = next(
+                    (item for item in draft.desired_objects
+                     if item.object_class is ObjectClass.TARGET), None,
+                )
+                if (
+                    draft.blueprint_ref != "FPA-BP-006"
+                    or set(classes) != _REQUIRED_WINRM_COLLECTOR_CLASSES
+                    or not all(item.desired_exists for item in draft.desired_objects)
+                    or target is None
+                    or dict(target.desired_fields).get("protocol") != "rdp"
+                    or dict(collector.desired_fields) != {
+                        "inherit_permission": True,
+                        "privileged_account": True,
+                        "owner_only_folder": True,
+                        "rdp_service_enabled": True,
+                        "recording_enabled": True,
+                        "rdp_event_filter_enabled": True,
+                        "rdp_event_filter_profile_matches": True,
+                        "non_rdp_services_disabled": True,
+                        "target_association_matches": True,
+                    }
+                ):
+                    raise PlanningDenied("WinRM collector intent must use the isolated fixed profile.")
+            required_secret_classes = (
+                _REQUIRED_DOMAIN_SECRET_CLASSES if domain is not None else
+                _REQUIRED_TARGET_BOUND_WEB_CLASSES if bound_web is not None else
+                _REQUIRED_WINRM_COLLECTOR_CLASSES if collector is not None else
+                _REQUIRED_WEB_SECRET_CLASSES
+                if draft.blueprint_ref == "FPA-BP-007"
+                else _REQUIRED_TARGET_SECRET_CLASSES
+            )
+            if (
+                set(classes) - (_SECRET_CLASSES | set(access_classes))
+                or not required_secret_classes.issubset(classes)
+            ):
                 raise PlanningDenied("SecretOnboardingScheme object shape is invalid.")
-            if any(classes.count(item) != 1 for item in _REQUIRED_SECRET_CLASSES):
+            if any(classes.count(item) != 1 for item in required_secret_classes):
                 raise PlanningDenied("SecretOnboardingScheme needs one required relation of each class.")
+            if draft.blueprint_ref == "FPA-BP-007" and (
+                ObjectClass.TARGET in classes
+                or ObjectClass.SECRET_METADATA in classes
+                or any(
+                    item in classes
+                    for item in {
+                        ObjectClass.LAUNCHER_BINDING,
+                        ObjectClass.POLICY_BINDING,
+                        ObjectClass.RDP_EVENT_FILTER_BINDING,
+                    }
+                )
+            ):
+                raise PlanningDenied("Web Secret onboarding object shape is invalid.")
+            if draft.blueprint_ref != "FPA-BP-007" and ObjectClass.WEB_SECRET_METADATA in classes:
+                raise PlanningDenied("Target Secret onboarding object shape is invalid.")
             required = [
                 item
                 for item in draft.desired_objects
-                if item.object_class in _REQUIRED_SECRET_CLASSES
+                if item.object_class in required_secret_classes
             ]
             if any(not item.desired_exists for item in required):
                 raise PlanningDenied("SecretOnboardingScheme required relations must exist.")
@@ -837,10 +1408,160 @@ class M2PlanningEngine:
             )
             if dict(template.desired_fields).get("compatibility") != "compatible":
                 raise PlanningDenied("SecretOnboardingScheme template compatibility is unresolved.")
-            if any(classes.count(item) > 1 for item in _SECRET_CLASSES - _REQUIRED_SECRET_CLASSES):
+            if any(classes.count(item) > 1 for item in _SECRET_CLASSES - required_secret_classes):
                 raise PlanningDenied("SecretOnboardingScheme optional relation is duplicated.")
-            if draft.material_reference_metadata is None:
+            controls = next(
+                (item for item in draft.desired_objects
+                 if item.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING),
+                None,
+            )
+            if controls is not None:
+                allowed = _REQUIRED_TARGET_SECRET_CLASSES | {
+                    ObjectClass.RDP_EVENT_FILTER_BINDING,
+                    ObjectClass.SECRET_SESSION_CONTROLS_BINDING,
+                }
+                if (
+                    draft.blueprint_ref != "FPA-BP-006"
+                    or set(classes) != allowed
+                    or not all(item.desired_exists for item in draft.desired_objects)
+                    or draft.material_reference_metadata is not None
+                ):
+                    raise PlanningDenied("Existing Secret controls object shape is invalid.")
+                profile = next(item for item in draft.desired_objects
+                               if item.object_class is ObjectClass.RDP_EVENT_FILTER_BINDING)
+                target = next(item for item in required if item.object_class is ObjectClass.TARGET)
+                fields = dict(controls.desired_fields)
+                if (
+                    dict(target.desired_fields).get("protocol") != "rdp"
+                    or fields != {
+                        "recording_enabled": True,
+                        "clipboard_blocking_enabled": True,
+                        "rdp_event_filter_enabled": True,
+                        "rdp_event_filter_profile_matches": True,
+                        "preserved_identity_digest": fields.get("preserved_identity_digest"),
+                        "event_filter_profile_digest": fields.get("event_filter_profile_digest"),
+                        "profile_ref": dict(profile.desired_fields).get("profile_ref"),
+                    }
+                ):
+                    raise PlanningDenied("Existing Secret controls must enable the fixed profile.")
+            web_service = next(
+                (item for item in draft.desired_objects
+                 if item.object_class is ObjectClass.WEB_SECRET_SERVICE_BINDING),
+                None,
+            )
+            if web_service is not None:
+                if (
+                    draft.blueprint_ref != "FPA-BP-007"
+                    or set(classes) != (_REQUIRED_WEB_SECRET_CLASSES | {
+                        ObjectClass.WEB_SECRET_SERVICE_BINDING,
+                    })
+                    or not all(item.desired_exists for item in draft.desired_objects)
+                    or draft.material_reference_metadata is not None
+                    or dict(web_service.desired_fields) != {
+                        "http_service_enabled": True,
+                    }
+                ):
+                    raise PlanningDenied("Existing Web Secret service object shape is invalid.")
+            elif controls is None and draft.material_reference_metadata is None:
                 raise PlanningDenied("SecretOnboardingScheme needs safe material metadata.")
+            if access_classes:
+                folder_binding = next(
+                    item
+                    for item in required
+                    if item.object_class is ObjectClass.FOLDER_BINDING
+                )
+                public_folder = next(
+                    item
+                    for item in draft.desired_objects
+                    if item.object_class is ObjectClass.PUBLIC_FOLDER
+                )
+                if (
+                    dict(folder_binding.desired_fields).get("folder_ref")
+                    != public_folder.object_ref
+                ):
+                    raise PlanningDenied(
+                        "Composite Linux onboarding Folder relation is invalid."
+                    )
+        elif draft.scheme_id is SchemeId.IDENTITY_LIFECYCLE:
+            if (
+                len(draft.desired_objects) != 2
+                or set(classes) != _IDENTITY_CLASSES
+                or any(classes.count(item) != 1 for item in _IDENTITY_CLASSES)
+                or any(not item.desired_exists for item in draft.desired_objects)
+                or draft.material_reference_metadata is not None
+            ):
+                raise PlanningDenied("IdentityLifecycleScheme object shape is invalid.")
+            group = next(
+                item
+                for item in draft.desired_objects
+                if item.object_class is ObjectClass.SPONSORED_GROUP
+            )
+            member = next(
+                item
+                for item in draft.desired_objects
+                if item.object_class is ObjectClass.SPONSORED_GROUP_MEMBER
+            )
+            group_fields = dict(group.desired_fields)
+            member_fields = dict(member.desired_fields)
+            if (
+                group_fields.get("sponsor_admin_scope_enforced") is not True
+                or member_fields.get("sponsored_group_ref") != group.object_ref
+            ):
+                raise PlanningDenied("IdentityLifecycleScheme fixed profile is invalid.")
+        else:
+            if (
+                set(classes) != _REQUIRED_APPROVAL_CLASSES
+                or any(classes.count(item) != 1 for item in _REQUIRED_APPROVAL_CLASSES)
+                or any(not item.desired_exists for item in draft.desired_objects)
+                or draft.material_reference_metadata is not None
+            ):
+                raise PlanningDenied("ApprovalAndObserveScheme object shape is invalid.")
+            profile = next(
+                item
+                for item in draft.desired_objects
+                if item.object_class is ObjectClass.APPROVAL_PROFILE_BINDING
+            )
+            secret = next(
+                item
+                for item in draft.desired_objects
+                if item.object_class is ObjectClass.SECRET_APPROVAL_BINDING
+            )
+            profile_fields = dict(profile.desired_fields)
+            secret_fields = dict(secret.desired_fields)
+            restore = draft.outcome_code == "restore_owned_original_approval"
+            if restore:
+                if (
+                    not self._approval_restore_profile_enabled
+                    or secret_fields != {
+                        "approval_profile_attached": False,
+                        "interactive_approval_required": False,
+                        "job_approval_required": False,
+                        "owner_bypass_allowed": False,
+                        "owned_original_baseline_verified": True,
+                        "ownership_evidence_ref": secret_fields.get("ownership_evidence_ref"),
+                    }
+                    or type(secret_fields.get("ownership_evidence_ref")) is not str
+                    or any(
+                        (contract.contract_id, contract.version, contract.source_ref) != (
+                            "approval-owned-restore-build29-state-v1", "1.0.0",
+                            "fortipam-700-build29-approval-owned-restore-projection",
+                        )
+                        for contract in (
+                            self.projection_contract(draft.scheme_id, item.object_class)
+                            for item in draft.desired_objects
+                        )
+                    )
+                ):
+                    raise PlanningDenied("Owned approval restoration requires its fixed protected profile.")
+            if (
+                set(profile_fields) != {"profile_mode", "profile_ref"}
+                or profile_fields.get("profile_mode") != "single_tier"
+                or secret_fields.get("approval_profile_attached") is not (not restore)
+                or secret_fields.get("interactive_approval_required") is not (not restore)
+                or secret_fields.get("job_approval_required") is not False
+                or secret_fields.get("owner_bypass_allowed") is not False
+            ):
+                raise PlanningDenied("ApprovalAndObserveScheme fixed profile is invalid.")
         if registered_risk == "high" and (
             draft.approval_class != "independent_approval" or not draft.separation_required
         ):
@@ -884,6 +1605,7 @@ class M2PlanningEngine:
                 self._projection_references(
                     projection,
                     desired.object_class,
+                    draft.scheme_id,
                 )
             )
         return self._authorize_references(
@@ -984,7 +1706,7 @@ class M2PlanningEngine:
             change = changes.get(projection.object_ref)
             if change is None:
                 raise PlanningDenied("Projection reference is outside the confirmed summary.")
-            references.extend(self._projection_references(projection, change.object_class))
+            references.extend(self._projection_references(projection, change.object_class, summary.scheme_id))
         return self._authorize_references(
             references,
             requester_digest=summary.requester_digest,
@@ -997,10 +1719,18 @@ class M2PlanningEngine:
         self,
         projection: AuthoritativeProjection,
         object_class: ObjectClass,
+        scheme_id: SchemeId | None = None,
     ) -> list[tuple[str, str]]:
         contract = self.projection_contract(
+            SchemeId.BULK_ONBOARDING
+            if scheme_id is SchemeId.BULK_ONBOARDING
+            else
             SchemeId.ACCESS_DOMAIN
             if object_class in _ACCESS_CLASSES
+            else SchemeId.APPROVAL_AND_OBSERVE
+            if object_class in _APPROVAL_CLASSES
+            else SchemeId.IDENTITY_LIFECYCLE
+            if object_class in _IDENTITY_CLASSES
             else SchemeId.SECRET_ONBOARDING,
             object_class,
         )
@@ -1203,12 +1933,14 @@ def _plan_content(
         "environment_ref": summary.environment_ref,
         "expires_at": expires_at,
         "lines": [line.as_dict() for line in lines],
-        "mcp_exposed": False,
+        "executor_mcp_exposed": False,
+        "executor_runtime_packaged": False,
         "plan_ref": plan_ref,
+        "planner_mcp_exposed": False,
+        "planner_runtime_packaged": True,
         "registry_schema_version": summary.registry_schema_version,
         "requester_digest": requester.digest,
         "revision": 1,
-        "runtime_packaged": False,
         "scheme_id": summary.scheme_id.value,
         "scheme_version": summary.scheme_version,
         "scope_ref": summary.scope_ref,
@@ -1219,6 +1951,15 @@ def _plan_content(
 
 
 def _depends_on(current: ObjectClass, candidate: ObjectClass) -> bool:
+    if current is ObjectClass.DISCOVERY_SOURCE_METADATA:
+        return candidate in _REQUIRED_DOMAIN_SECRET_CLASSES
+    if current is ObjectClass.SPONSORED_GROUP_MEMBER:
+        return candidate is ObjectClass.SPONSORED_GROUP
+    if current is ObjectClass.SECRET_METADATA and candidate in {
+        ObjectClass.PUBLIC_FOLDER,
+        ObjectClass.ACCESS_GRANT,
+    }:
+        return True
     current_order = _DEPENDENCY_ORDER[current]
     candidate_order = _DEPENDENCY_ORDER[candidate]
     if candidate_order >= current_order:
@@ -1227,12 +1968,34 @@ def _depends_on(current: ObjectClass, candidate: ObjectClass) -> bool:
         return False
     if current in _SECRET_CLASSES and candidate not in _SECRET_CLASSES:
         return False
-    if current is ObjectClass.SECRET_METADATA:
+    if current in _APPROVAL_CLASSES and candidate not in _APPROVAL_CLASSES:
+        return False
+    if current in {ObjectClass.SECRET_METADATA, ObjectClass.WINRM_COLLECTOR_METADATA}:
         return candidate in {
             ObjectClass.FOLDER_BINDING,
             ObjectClass.TARGET,
             ObjectClass.TEMPLATE_BINDING,
         }
+    if current is ObjectClass.DOMAIN_SECRET_METADATA:
+        return candidate in {
+            ObjectClass.FOLDER_BINDING, ObjectClass.DOMAIN_TARGET_BINDING,
+            ObjectClass.TEMPLATE_BINDING,
+        }
+    if current is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA:
+        return candidate in {
+            ObjectClass.FOLDER_BINDING,
+            ObjectClass.WEB_TARGET_BINDING,
+            ObjectClass.TEMPLATE_BINDING,
+        }
+    if current is ObjectClass.WEB_SECRET_METADATA:
+        return candidate in {
+            ObjectClass.FOLDER_BINDING,
+            ObjectClass.TEMPLATE_BINDING,
+        }
+    if current is ObjectClass.WEB_SECRET_SERVICE_BINDING:
+        return candidate is ObjectClass.WEB_SECRET_METADATA
+    if current is ObjectClass.SECRET_APPROVAL_BINDING:
+        return candidate is ObjectClass.APPROVAL_PROFILE_BINDING
     if current in {ObjectClass.LAUNCHER_BINDING, ObjectClass.POLICY_BINDING}:
         return candidate is ObjectClass.SECRET_METADATA
     if current in {
@@ -1242,6 +2005,49 @@ def _depends_on(current: ObjectClass, candidate: ObjectClass) -> bool:
     }:
         return candidate is ObjectClass.PUBLIC_FOLDER
     return False
+
+
+def _mutable_plan_changes(summary: FinalIntentSummary) -> list[ObjectChange]:
+    """Return physical mutations, collapsing the BP005 Folder semantic alias.
+
+    A combined BP005 draft deliberately carries both the Access Domain
+    ``PublicFolder`` view and the Secret ``FolderBinding`` view so each source
+    can verify its own contract.  When both views authoritatively report the
+    same absent Folder, one PublicFolder create realizes both expected states;
+    a second FolderBinding action would be a fictitious product mutation.
+    """
+
+    mutable = [
+        change
+        for change in summary.object_changes
+        if change.change_kind is not ChangeKind.NO_OP
+    ]
+    if not (
+        summary.scheme_id is SchemeId.SECRET_ONBOARDING
+        and summary.blueprint_ref == "FPA-BP-005"
+        and summary.outcome_code == "onboard_privileged_resource"
+    ):
+        return mutable
+    public_folders = tuple(
+        change
+        for change in mutable
+        if change.object_class is ObjectClass.PUBLIC_FOLDER
+    )
+    folder_bindings = tuple(
+        change
+        for change in mutable
+        if change.object_class is ObjectClass.FOLDER_BINDING
+    )
+    if (
+        len(public_folders) == 1
+        and len(folder_bindings) == 1
+        and public_folders[0].change_kind is ChangeKind.CREATE
+        and folder_bindings[0].change_kind is ChangeKind.CREATE
+        and dict(folder_bindings[0].expected_fields).get("folder_ref")
+        == public_folders[0].object_ref
+    ):
+        return [change for change in mutable if change is not folder_bindings[0]]
+    return mutable
 
 
 def _object_kind_code(object_class: ObjectClass) -> str:
@@ -1264,11 +2070,12 @@ def _current_aggregate(
     changes: Sequence[ObjectChange],
     projections: Mapping[str, AuthoritativeProjection],
     now_epoch: int,
+    contract_resolver: Callable[[SchemeId, ObjectClass], ProjectionContract],
 ) -> str:
     digests: list[str] = []
     for change in changes:
         projection = projections[change.object_ref]
-        contract = M2PlanningEngine.projection_contract(scheme_id, change.object_class)
+        contract = contract_resolver(scheme_id, change.object_class)
         _validate_projection(projection, contract, now_epoch)
         digests.append(projection.state_digest)
     return canonical_digest(digests)

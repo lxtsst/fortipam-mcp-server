@@ -34,21 +34,21 @@
       "boundary": "API discovery and risk classification only; incomplete and never a callable router."
     },
     {
-      "source_id": "fortipam-1-9-1-compatibility",
-      "evidence_class": "sanitized_compatibility_observation",
-      "title": "FortiPAM 1.9.1 fixed-read compatibility observation",
+      "source_id": "fortipam-1-9-1-lab",
+      "evidence_class": "sanitized_lab_observation",
+      "title": "FortiPAM 1.9.1 fixed-read acceptance and API identity audit",
       "product_version": "1.9.1",
       "accessed_at": "2026-08-21",
-      "locator": "packaged:compatibility-observation",
-      "boundary": "Validates only named fixed-read behavior in a bounded non-production test environment."
+      "locator": "docs/ACCEPTANCE.md",
+      "boundary": "Validates only the named fixed reads, sanitized response handling, and derived API identity posture on one lab appliance."
     },
     {
       "source_id": "fortipam-derived-notes",
       "evidence_class": "derived_operational_knowledge",
-      "title": "Reviewed FortiPAM operational notes",
+      "title": "FortiPAM engineering study notes",
       "product_version": "1.9.0 control baseline with 1.9.1 watch items",
       "accessed_at": "2026-08-21",
-      "locator": "derived:reviewed-operational-notes",
+      "locator": "derived:FortiPAM-study-notes",
       "boundary": "Scenario seed only; maker-reviewed, independently unreviewed, and lab-unvalidated."
     },
     {
@@ -123,11 +123,11 @@
       "risk_class": "low",
       "intent": "Separate local configuration, TLS transport, appliance response, firmware drift, and configuration-shape evidence before deeper diagnosis.",
       "documented_versions": ["1.9.0", "1.9.1"],
-      "version_notes": "The packaged API catalog is 1.9.0 while bounded compatibility checks cover 1.9.1; fixed-read success does not prove full API compatibility.",
+      "version_notes": "The packaged API catalog is 1.9.0 while the accepted lab appliance is 1.9.1 build 1758; fixed-read success does not prove full API compatibility.",
       "source_refs": [
         {"source_id": "fortipam-1-9-1-admin", "detail": "pp. 76-85 and system information guidance"},
         {"source_id": "fortipam-1-9-0-api-catalog", "detail": "GET system status, system global, and license-status candidates"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "bounded system-status, system-global, and minimized license/support posture checks"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "accepted system-status, system-global, and minimized license/support posture summaries"}
       ],
       "symptoms": ["FortiPAM API is unreachable", "MCP health succeeds but live reads fail", "documented and observed versions differ"],
       "evidence_ladder": [
@@ -154,7 +154,7 @@
       "source_refs": [
         {"source_id": "fortipam-1-9-0-api-catalog", "detail": "1,295 operations across 88 of 91 resource pages"},
         {"source_id": "fortipam-1-9-1-admin", "detail": "current product behavior and role model"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "three named fixed-read routes checked only"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "three named routes accepted only"}
       ],
       "symptoms": ["An integration needs an undocumented endpoint", "A 1.9.0 operation is assumed to work on 1.9.1", "A catalog search result is mistaken for a callable tool"],
       "evidence_ladder": [
@@ -178,7 +178,7 @@
       "version_notes": "A fixed 1.9.1 lab audit found a custom profile with nine write-capable permission categories, one disabled category, and a trust-host restriction. The identity is dedicated but not least privilege; no identity, profile, category, or credential values were retained.",
       "source_refs": [
         {"source_id": "fortipam-1-9-1-admin", "detail": "User management, API user, role, and access-control sections pp. 326-365"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "bounded API-user and access-profile checks exercised least-privilege classification without retaining protected values"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "fixed API-user and access-profile reads confirmed a non-least-privilege custom profile without retaining protected values"}
       ],
       "symptoms": ["The API token can read more than the MCP needs", "Authentication succeeds but role scope is unknown", "A new read tool needs permission evidence"],
       "evidence_ladder": [
@@ -275,7 +275,7 @@
       "source_refs": [
         {"source_id": "fortipam-1-9-1-release", "detail": "Resolved issue 1277720"},
         {"source_id": "fortipam-1-9-1-admin", "detail": "Active sessions and live recording pp. 395-398; video storage pp. 540-556; troubleshooting pp. 561-571"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "Fixed current-disk-usage projection checked without capacities, timestamps, identities, or recordings"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "Fixed current-disk-usage projection accepted without capacities, timestamps, identities, or recordings"}
       ],
       "symptoms": ["Agentless session disconnects when recording is enabled", "Recording is missing", "WebRDP opens and closes"],
       "evidence_ladder": [
@@ -301,7 +301,7 @@
         {"source_id": "fortipam-1-9-1-admin", "detail": "FortiPAM server and Secret Gateway pp. 466-481"},
         {"source_id": "fortipam-1-9-0-api-catalog", "detail": "secret gateway CMDB and internal-info operations are classified high risk"},
         {"source_id": "fortipam-derived-notes", "detail": "Secret Gateway evidence ladder and deployment model"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "No-parameter gateway collection was incompatible and was not promoted"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "No-parameter gateway collection returned HTTP 400 and was not promoted"}
       ],
       "symptoms": ["Gateway appears connected but target launch times out", "Gateway chain does not advertise", "mTLS or gateway identity fails"],
       "evidence_ladder": [
@@ -375,7 +375,7 @@
       "source_refs": [
         {"source_id": "fortipam-1-9-1-admin", "detail": "FortiAnalyzer logging pp. 460-462 and log source selection pp. 399-401"},
         {"source_id": "fortipam-1-9-0-api-catalog", "detail": "log.fortianalyzer setting and monitor license status candidates"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "configuration route supported the safe projection contract without retaining values"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "configuration route returned HTTP 200 JSON and the safe projection contract was verified without retaining values"}
       ],
       "symptoms": ["Connector is configured but no logs arrive", "FortiAnalyzer shows unauthorized", "Certificate verification fails", "FortiAnalyzer is unavailable as a log source"],
       "evidence_ladder": [
@@ -428,7 +428,7 @@
         {"source_id": "fortipam-1-9-1-release", "detail": "Resolved issue 1273260"},
         {"source_id": "fortipam-1-9-1-admin", "detail": "Password changers pp. 273-292 and troubleshooting pp. 574-578"},
         {"source_id": "fortipam-derived-notes", "detail": "Secrets lifecycle evidence ladder"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "Fixed Password Changer collection projection checked without names, procedures, authentication modes, references, origins, or credentials"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "Fixed Password Changer collection projection accepted without names, procedures, authentication modes, references, origins, or credentials"}
       ],
       "symptoms": ["Password verification fails", "Password change fails", "Target rejects the generated password", "A dependency remains stale after rotation"],
       "evidence_ladder": [
@@ -526,7 +526,7 @@
         {"source_id": "community-fortios-password-changer", "detail": "FortiOS 7.6.3+ prompt-change compatibility lead"},
         {"source_id": "fortipam-1-9-1-admin", "detail": "Password changer configuration and troubleshooting sections"},
         {"source_id": "fortipam-1-9-1-release", "detail": "Version-specific password-changer resolved issues"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "Fixed Password Changer configuration projection and identity-denial checks"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "Fixed Password Changer configuration projection and separate 8-positive/11-denial identity acceptance"}
       ],
       "symptoms": ["FortiOS password rotation fails after target upgrade", "Password changer no longer matches the administrator prompt", "Verification fails only for FortiOS 7.6.3 or later targets"],
       "evidence_ladder": [
@@ -551,7 +551,7 @@
       "source_refs": [
         {"source_id": "community-fortianalyzer-parsing", "detail": "Named FortiPAM/FortiAnalyzer parsing and display compatibility guidance"},
         {"source_id": "fortipam-1-9-1-admin", "detail": "FortiAnalyzer logging and log-source guidance"},
-        {"source_id": "fortipam-1-9-1-compatibility", "detail": "FortiPAM sender-side minimized configuration projection only"}
+        {"source_id": "fortipam-1-9-1-lab", "detail": "FortiPAM sender-side minimized configuration projection only"}
       ],
       "symptoms": ["Secret-related logs arrive under a FortiGate category", "FortiAnalyzer receives logs but cannot display secret-file events", "FortiPAM sender is configured but parser support is unknown"],
       "evidence_ladder": [

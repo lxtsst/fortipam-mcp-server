@@ -17,5 +17,6 @@ product/source version, `lab_state`, and the smallest authorized next check.
 Never convert a scenario candidate, a catalog result, or a Community article
 into a device call.
 
-For the public authorization, redaction, and output boundaries, read
-[`SECURITY_MODEL.md`](../../../../../docs/SECURITY_MODEL.md).
+For diagnostic authorization and minimized evidence boundaries, see the
+[security model](../../../../../docs/SECURITY_MODEL.md) and
+[diagnostic authorization implementation](../../../../../src/fortipam_mcp/diagnostic_authorization.py).

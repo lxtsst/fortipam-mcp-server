@@ -13,7 +13,6 @@ from typing import Any
 
 APP_WHEEL_LABEL = "org.opencontainers.image.fortipam.app-wheel-sha256"
 EXPECTED_USER = "10001:10001"
-EXPECTED_IMAGE_ENTRYPOINT = ["fortipam-mcp-server"]
 EXPECTED_MEMORY_BYTES = 256 * 1024 * 1024
 EXPECTED_NANO_CPUS = 1_000_000_000
 EXPECTED_PIDS_LIMIT = 128
@@ -118,9 +117,7 @@ def verify_provenance(
         "container_image_match": image_match,
         "wheel_label_match": wheel_label == expected_wheel_sha256,
         "image_user_match": image_config.get("User") == EXPECTED_USER,
-        "image_entrypoint_match": (
-            image_config.get("Entrypoint") == EXPECTED_IMAGE_ENTRYPOINT
-        ),
+        "image_entrypoint_match": image_config.get("Entrypoint") == [expected_entrypoint],
         "container_user_match": config.get("User") == EXPECTED_USER,
         "container_entrypoint_match": entrypoint == [expected_entrypoint],
         "read_only_rootfs": host_config.get("ReadonlyRootfs") is True,

@@ -1,0 +1,299 @@
+"""Fixed forced-command worker for one owned RADIUS lab fixture.
+
+Standalone standard-library program for a separately qualified dedicated SSH
+identity. The production entry point accepts no arguments, paths or commands.
+It does not install itself, enable SSH access or modify the running fixture.
+"""
+from __future__ import annotations
+
+import hashlib
+import ipaddress
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import stat
+import subprocess
+import sys
+import time
+from typing import Any, Callable
+
+CONTRACT = "radius-owned-fixture-material-channel-v1"
+_ROOT = Path("/var/lib/fortipam-mcp/radius-fixture")
+_REQUEST_FIELDS = {"action_id", "action_version", "plan_digest", "policy_decision_digest",
+    "authorization_digest", "scope_digest", "audience_digest", "provider_class", "purpose",
+    "requested_at", "expires_at"}
+_HEX = re.compile(r"[0-9a-f]{64}\Z")
+_ALPHABET = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+
+
+def _wipe(value: bytearray) -> None:
+    value[:] = bytes(len(value))
+    try: value.clear()
+    except BufferError: pass
+
+
+_BYTEARRAY_TYPE = bytearray
+
+
+def _erase_transfer_storage(storage: bytearray) -> None:
+    try:
+        _wipe(storage)
+    except BaseException:
+        for index in range(len(storage)):
+            storage[index] = 0
+        raise
+
+
+def _take_mutable_prefix(storage: bytearray, length: int) -> bytearray:
+    """Transfer an exact prefix, erasing the original allocation before release.
+
+    Shrinking a populated bytearray may free an uncleared allocation. Copies
+    here use a destination view, avoiding bytearray slice-assignment temporaries.
+    The caller owns the returned array; failed transfers erase both allocations.
+    """
+    result: bytearray | None = None
+    try:
+        try:
+            if (type(storage) is not _BYTEARRAY_TYPE or type(length) is not int
+                    or not 0 <= length <= len(storage)):
+                raise ValueError("The private mutable prefix is unavailable.")
+            result = bytearray(length)
+            with memoryview(storage) as source, memoryview(result) as destination:
+                destination[:] = source[:length]
+        finally:
+            if type(storage) is _BYTEARRAY_TYPE:
+                _erase_transfer_storage(storage)
+    except BaseException:
+        try:
+            if result is not None:
+                _erase_transfer_storage(result)
+        finally:
+            if type(storage) is _BYTEARRAY_TYPE:
+                _erase_transfer_storage(storage)
+        raise
+    if result is None:
+        raise ValueError("The private mutable prefix is unavailable.")
+    return result
+
+
+def _pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in items:
+        if key in result: raise ValueError
+        result[key] = value
+    return result
+
+
+def _json(value: bytearray) -> dict[str, Any]:
+    decoded = json.loads(value, object_pairs_hook=_pairs)
+    if type(decoded) is not dict: raise ValueError
+    return decoded
+
+
+def _directory(path: Path, uid: int) -> int:
+    descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        if not path.is_absolute() or ".." in path.parts: raise ValueError
+        for part in path.parts[1:]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        info = os.fstat(descriptor)
+        if info.st_uid != uid or stat.S_IMODE(info.st_mode) != 0o700: raise ValueError
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _read(directory: int, name: str, uid: int, maximum: int) -> bytearray:
+    raw = bytearray()
+    try:
+        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        raw = bytearray(maximum + 1)
+        try:
+            before = os.fstat(descriptor)
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid != uid or before.st_nlink != 1
+                    or stat.S_IMODE(before.st_mode) != 0o600 or not 0 < before.st_size <= maximum): raise ValueError
+            count = 0
+            while count < before.st_size:
+                with memoryview(raw)[count:before.st_size] as view:
+                    received = os.readv(descriptor,[view])
+                if received <= 0: raise ValueError
+                count += received
+            after = os.fstat(descriptor)
+            if (os.read(descriptor,1) or (before.st_dev,before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)
+                    != (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns)): raise ValueError
+            raw = _take_mutable_prefix(raw, count)
+            return raw
+        except BaseException:
+            _wipe(raw)
+            raise
+        finally:
+            os.close(descriptor)
+    except BaseException:
+        _erase_transfer_storage(raw)
+        raise
+
+
+def _metadata(directory: int, name: str, uid: int) -> dict[str, Any]:
+    raw = _read(directory,name,uid,16384)
+    try: return _json(raw)
+    finally: _wipe(raw)
+
+
+def _exists(directory: int, name: str) -> bool:
+    try: os.stat(name,dir_fd=directory,follow_symlinks=False)
+    except FileNotFoundError: return False
+    return True
+
+
+def _claim(directory: int, value: dict[str, Any]) -> None:
+    data = json.dumps(value,sort_keys=True,separators=(",",":")).encode()
+    descriptor = os.open("create-material.claim.json", os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,
+                         0o600,dir_fd=directory)
+    try:
+        offset = 0
+        while offset < len(data):
+            sent = os.write(descriptor,data[offset:])
+            if sent <= 0: raise ValueError
+            offset += sent
+        os.fsync(descriptor)
+        os.fsync(directory)
+    finally: os.close(descriptor)
+
+
+def _clock(request: dict[str, Any], policy: dict[str, Any], now: int) -> None:
+    if (type(now) is not int or type(request["requested_at"]) is not int
+            or type(request["expires_at"]) is not int or type(policy["expires_at"]) is not int
+            or not 0 <= request["requested_at"] <= now < request["expires_at"]
+            or not 0 < request["expires_at"]-request["requested_at"] <= 60
+            or request["expires_at"] > policy["expires_at"]): raise ValueError
+
+
+def _inspect(container_id: str) -> dict[str, Any]:
+    result = subprocess.run(["/usr/bin/docker","container","inspect",container_id],
+        capture_output=True,check=True,timeout=5)
+    values = json.loads(result.stdout)
+    if type(values) is not list or len(values) != 1 or type(values[0]) is not dict: raise ValueError
+    return values[0]
+
+
+def _handle(root: Path, incoming: dict[str, Any], *, clock: Callable[[], int],
+            inspector: Callable[[str], dict[str, Any]], owner_uid: int = 0,
+            config_uid: int = 10001) -> bytearray:
+    """Private test seam; the standalone entry point fixes root, identities and inspector."""
+    directory = config = material_dir = None
+    material, clients, wanted = bytearray(), bytearray(), bytearray()
+    try:
+        if set(incoming) != {"contract","operation","parameters_digest","source_policy_digest","request"} or incoming["contract"] != CONTRACT:
+            raise ValueError
+        if incoming["operation"] not in {"validate","acquire"}: raise ValueError
+        request = incoming["request"]
+        if type(request) is not dict or set(request) != _REQUEST_FIELDS: raise ValueError
+        if (request["action_id"] != "radius-server-create" or request["action_version"] != "1.0.0"
+                or request["provider_class"] != "owned_lab_fixture_reference"
+                or request["purpose"] != "initial_onboarding"): raise ValueError
+        for name in ("plan_digest","policy_decision_digest","authorization_digest","scope_digest","audience_digest"):
+            if type(request[name]) is not str or _HEX.fullmatch(request[name]) is None: raise ValueError
+        directory = _directory(root,owner_uid)
+        policy = _metadata(directory,"create-material-policy.json",owner_uid)
+        if hashlib.sha256(json.dumps(policy,sort_keys=True,separators=(",",":")).encode()).hexdigest() != incoming["source_policy_digest"]:
+            raise ValueError
+        if set(policy) != {"contract","parameters_digest","scope_digest","audience_digest","fixture","expires_at"}:
+            raise ValueError
+        if (policy["contract"] != CONTRACT or type(policy["parameters_digest"]) is not str
+                or _HEX.fullmatch(policy["parameters_digest"]) is None
+                or policy["parameters_digest"] != incoming["parameters_digest"]
+                or policy["scope_digest"] != request["scope_digest"]
+                or policy["audience_digest"] != request["audience_digest"]): raise ValueError
+        first_now = clock()
+        _clock(request,policy,first_now)
+        if _exists(directory,"create-material.claim.json"): raise ValueError
+        expected = policy["fixture"]
+        if type(expected) is not dict or set(expected) != {"binding","ack","config_digest"}: raise ValueError
+        bound = _metadata(directory,"binding.private.json",owner_uid)
+        ack = _metadata(directory,"start.ack.json",owner_uid)
+        if (bound != expected["binding"] or ack != expected["ack"] or ack["nonce"] != bound["fixture_nonce"]
+                or type(bound["expires_at"]) is not int or policy["expires_at"] > bound["expires_at"]
+                or type(ack["container_id"]) is not str or _HEX.fullmatch(ack["container_id"]) is None): raise ValueError
+        for name in ("device_ip","server_ip"):
+            address = ipaddress.IPv4Address(bound[name])
+            if not address.is_private or str(address) != bound[name]: raise ValueError
+        config = _directory(root/"config",config_uid)
+        main = _read(config,"radiusd.conf",config_uid,32768)
+        try:
+            if hashlib.sha256(main).hexdigest() != expected["config_digest"]: raise ValueError
+        finally: _wipe(main)
+        current = inspector(ack["container_id"])
+        if (current["Id"] != ack["container_id"] or current["State"]["Running"] is not True
+                or current["Image"] != bound["image_id"]
+                or current["Config"]["Labels"]["fortipam.radius.fixture"] != bound["fixture_nonce"]
+                or current["Config"]["User"] != "10001:10001"
+                or current["HostConfig"]["ReadonlyRootfs"] is not True
+                or current["HostConfig"]["LogConfig"]["Type"] != "none"
+                or not any(m["Source"] == str(root/"config") and m["Destination"] == "/radius-config"
+                    and m["Type"] == "bind" and m["RW"] is False for m in current["Mounts"])): raise ValueError
+        material_dir = _directory(root/"material",owner_uid)
+        info = os.stat("primary-secret",dir_fd=material_dir,follow_symlinks=False)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != owner_uid or info.st_nlink != 1
+                or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size != 32): raise ValueError
+        final_now = clock()
+        _clock(request,policy,final_now)
+        if final_now < first_now: raise ValueError
+        if (_metadata(directory,"create-material-policy.json",owner_uid) != policy
+                or _metadata(directory,"binding.private.json",owner_uid) != bound
+                or _metadata(directory,"start.ack.json",owner_uid) != ack): raise ValueError
+        if incoming["operation"] == "validate": return bytearray(b"available\n")
+        _claim(directory,{"contract":CONTRACT,"parameters_digest":incoming["parameters_digest"],
+            "request_digest":hashlib.sha256(json.dumps(request,sort_keys=True,separators=(",",":")).encode()).hexdigest(),
+            "claimed_at":final_now})
+        material = _read(material_dir,"primary-secret",owner_uid,32)
+        if len(material) != 32 or any(value not in _ALPHABET for value in material): raise ValueError
+        clients = _read(config,"clients.conf",config_uid,4096)
+        for ordinal,address in enumerate((bound["device_ip"],bound["server_ip"])):
+            wanted.extend(("client fixture_"+str(ordinal)+" {\n ipaddr = "+address+
+                "/32\n proto = udp\n require_message_authenticator = yes\n limit_proxy_state = yes\n secret = \"").encode())
+            wanted.extend(material)
+            wanted.extend(b'"\n}\n')
+        if clients != wanted: raise ValueError
+        after_read = clock()
+        _clock(request,policy,after_read)
+        if after_read < final_now: raise ValueError
+        result, material = material, bytearray()
+        return result
+    finally:
+        for value in (material,clients,wanted): _wipe(value)
+        for fd in (material_dir,config,directory):
+            if fd is not None: os.close(fd)
+
+
+def main() -> int:
+    request, output = bytearray(), bytearray()
+    try:
+        if len(sys.argv) != 1 or os.geteuid() != 0 or os.environ.get("SSH_ORIGINAL_COMMAND"):
+            raise ValueError
+        def expired(signum: int, frame: object) -> None: raise TimeoutError
+        signal.signal(signal.SIGALRM,expired)
+        signal.alarm(20)
+        request.extend(sys.stdin.buffer.read(16385))
+        if not 0 < len(request) <= 16384: raise ValueError
+        output = _handle(_ROOT,_json(request),clock=lambda:int(time.time()),inspector=_inspect)
+        offset = 0
+        while offset < len(output):
+            with memoryview(output)[offset:] as view: sent = os.write(sys.stdout.fileno(),view)
+            if sent <= 0: raise OSError
+            offset += sent
+        return 0
+    except BaseException:
+        return 1
+    finally:
+        signal.alarm(0)
+        _wipe(request)
+        _wipe(output)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

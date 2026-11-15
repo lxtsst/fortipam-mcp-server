@@ -34,21 +34,38 @@ the protected RDP launch succeeded. This evidence validates the causal chain
 for that lab and version only. It does not establish a general write contract,
 least-privilege permission, HA behavior, or production readiness.
 
-## Fixed diagnostic candidates
+## Fixed V4 diagnostic package
 
-These commands are candidates for future fixed SSH projection adapters or a
-separately authorized operator runbook. They are not callable through the
-current V3 MCP surface:
+The current V3 surface cannot call these commands. The V4
+`get_v4_ztna_device_context_diagnostic` package can run this exact fixed
+sequence only when its feature flag and private pinned SSH configuration are
+independently enabled. It accepts no caller-controlled endpoint, Access Proxy,
+tag, command, or debug input, returns only categorical evidence, and does not
+perform a write:
 
 ```text
-get firewall access-proxy
+show full-configuration firewall access-proxy | grep -A 80 "^ *edit.*<private-access-proxy>"
 diagnose firewall dynamic list
 diagnose wad dev query-by ipv4 <private-adapter-resolved-ip>
 ```
 
-Use `get` for effective Access Proxy values; `show` may omit defaults. The
-endpoint address must be resolved inside the private adapter from an authorized
-opaque reference. It must not be accepted from or returned to the model.
+Treat `get firewall access-proxy` as a coarse diagnostic summary only. The
+bounded client-certificate action instead reads a complete object projection
+through a private, fixed `show full-configuration firewall access-proxy | grep
+-A 80` command anchored to the selected `edit` line; a normal `show` may omit
+defaults and a summary cannot prove the two field values. The endpoint address
+must be resolved inside the private adapter from an authorized opaque reference.
+It must not be accepted from or returned to the model. The local package is not
+candidate-deployed or live read-only accepted, so a successful local test or
+configuration load is not diagnosis evidence.
+
+The V4 `get_v4_ztna_folder_control_posture` package is a separate fixed
+read-only check for one private Folder reference. It returns only whether the
+Folder inherits ZTNA control or has an explicit override, and whether a Tag
+assignment is observable. It does not return the Folder reference or Tag value,
+and it leaves Tag match, multi-Tag/AND-OR logic, Secret override, and launch
+authorization unresolved. It runs only when its own feature and private adapter
+settings are enabled, and is not candidate-deployed or live read-only accepted.
 
 Short-lived WAD debug is higher risk because it can contain identity, target,
 and token material. A future fixed runbook may use only this bounded sequence

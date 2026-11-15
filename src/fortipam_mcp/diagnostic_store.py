@@ -35,7 +35,14 @@ _BASELINE_ID = re.compile(r"^[a-z][a-z0-9_-]{2,63}$")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9_-]{2,63}$")
 _NAMESPACE_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _EVENT_TYPES: Final = frozenset(
-    {"baseline_create", "baseline_load", "baseline_compare", "evidence_correlate", "store_verify"}
+    {
+        "baseline_create",
+        "baseline_load",
+        "baseline_compare",
+        "evidence_correlate",
+        "ha_reconcile",
+        "store_verify",
+    }
 )
 _BASELINE_EVENT_TYPES: Final = frozenset(
     {"baseline_create", "baseline_load", "baseline_compare", "store_verify"}
@@ -46,12 +53,23 @@ _DRIFT_OUTCOMES: Final = frozenset(
 _CORRELATION_OUTCOMES: Final = frozenset(
     {"temporally_aligned", "operationally_consistent", "contradictory", "not_assessed"}
 )
+_HA_RECONCILIATION_OUTCOMES: Final = frozenset(
+    {
+        "contradictory",
+        "degraded",
+        "out_of_sync",
+        "not_assessed",
+        "eligible_for_operator_review",
+        "rejected",
+    }
+)
 _EVENT_OUTCOMES: Final = MappingProxyType(
     {
         "baseline_create": frozenset({"accepted", "rejected"}),
         "baseline_load": frozenset({"accepted", "rejected"}),
         "baseline_compare": _DRIFT_OUTCOMES,
         "evidence_correlate": _CORRELATION_OUTCOMES,
+        "ha_reconcile": _HA_RECONCILIATION_OUTCOMES,
         "store_verify": frozenset({"accepted", "rejected"}),
     }
 )

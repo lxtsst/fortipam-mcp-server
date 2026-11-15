@@ -1,4 +1,4 @@
-"""Immutable models for the non-executable FortiPAM V4 M2 planner."""
+"""Immutable models for the non-executable FortiPAM V4 planner."""
 
 from __future__ import annotations
 
@@ -15,11 +15,15 @@ class PlanningContractError(ValueError):
 
 
 class SchemeId(StrEnum):
+    BULK_ONBOARDING = "BulkOnboardingScheme"
     ACCESS_DOMAIN = "AccessDomainScheme"
+    APPROVAL_AND_OBSERVE = "ApprovalAndObserveScheme"
+    IDENTITY_LIFECYCLE = "IdentityLifecycleScheme"
     SECRET_ONBOARDING = "SecretOnboardingScheme"
 
 
 class ObjectClass(StrEnum):
+    DISCOVERY_SOURCE_METADATA = "DiscoverySourceMetadata"
     PUBLIC_FOLDER = "PublicFolder"
     ACCESS_GRANT = "AccessGrant"
     CLASSIFICATION_BINDING = "ClassificationBinding"
@@ -28,14 +32,29 @@ class ObjectClass(StrEnum):
     TARGET = "Target"
     TEMPLATE_BINDING = "TemplateBinding"
     SECRET_METADATA = "SecretMetadata"
+    WEB_SECRET_METADATA = "WebSecretMetadata"
+    DOMAIN_TARGET_BINDING = "DomainTargetBinding"
+    DOMAIN_SECRET_METADATA = "DomainSecretMetadata"
+    WEB_TARGET_BINDING = "WebTargetBinding"
+    TARGET_BOUND_WEB_SECRET_METADATA = "TargetBoundWebSecretMetadata"
+    WINRM_COLLECTOR_METADATA = "WinrmCollectorMetadata"
     LAUNCHER_BINDING = "LauncherBinding"
     POLICY_BINDING = "PolicyBinding"
+    RDP_EVENT_FILTER_BINDING = "RdpEventFilterBinding"
+    APPROVAL_PROFILE_BINDING = "ApprovalProfileBinding"
+    SECRET_APPROVAL_BINDING = "SecretApprovalBinding"
+    SECRET_SESSION_CONTROLS_BINDING = "SecretSessionControlsBinding"
+    WEB_SECRET_SERVICE_BINDING = "WebSecretServiceBinding"
+    SPONSORED_GROUP = "SponsoredGroup"
+    SPONSORED_GROUP_MEMBER = "SponsoredGroupMember"
 
 
 class FieldKind(StrEnum):
     BOOLEAN = "boolean"
     ENUM = "enum"
     REFERENCE = "reference"
+    DIGEST = "digest"
+    POSITIVE_INTEGER = "positive_integer"
 
 
 class ChangeKind(StrEnum):
@@ -117,6 +136,8 @@ class AuthenticatedRequester:
 
     subject_ref: str
     principal_class: str
+    identity_authority_ref: str | None = None
+    subject_namespace: str | None = None
 
     def __post_init__(self) -> None:
         require_ref(self.subject_ref, "subject_ref")
@@ -124,11 +145,45 @@ class AuthenticatedRequester:
             raise PlanningContractError(
                 "M2 confirmation requires an authenticated human operator requester."
             )
+        if (self.identity_authority_ref is None) is not (
+            self.subject_namespace is None
+        ):
+            raise PlanningContractError(
+                "Requester identity binding must be complete."
+            )
+        if (
+            self.identity_authority_ref is not None
+            and self.subject_namespace is not None
+        ):
+            require_ref(
+                self.identity_authority_ref,
+                "requester identity_authority_ref",
+            )
+            require_ref(self.subject_namespace, "requester subject_namespace")
 
     @property
     def digest(self) -> str:
+        content: dict[str, CanonicalValue] = {
+            "subject_ref": self.subject_ref,
+            "principal_class": self.principal_class,
+        }
+        if self.identity_authority_ref is not None:
+            content["identity_authority_ref"] = self.identity_authority_ref
+            content["subject_namespace"] = self.subject_namespace
+        return canonical_digest(content)
+
+    @property
+    def identity_digest(self) -> str | None:
+        """Return a comparable human-identity digest only for a full binding."""
+
+        if self.identity_authority_ref is None or self.subject_namespace is None:
+            return None
         return canonical_digest(
-            {"subject_ref": self.subject_ref, "principal_class": self.principal_class}
+            {
+                "identity_authority_ref": self.identity_authority_ref,
+                "subject_namespace": self.subject_namespace,
+                "subject_ref": self.subject_ref,
+            }
         )
 
 
@@ -194,10 +249,16 @@ class FieldRule:
         elif self.enum_values:
             raise PlanningContractError("Only enum fields may declare values.")
 
-    def validate(self, value: object) -> bool | str:
+    def validate(self, value: object) -> bool | str | int:
         if self.kind is FieldKind.BOOLEAN:
             if type(value) is not bool:
                 raise PlanningContractError(f"{self.name} must be boolean.")
+            return value
+        if self.kind is FieldKind.POSITIVE_INTEGER:
+            if type(value) is not int or not 0 < value <= 2_147_483_647:
+                raise PlanningContractError(
+                    f"{self.name} must be a bounded positive integer."
+                )
             return value
         if type(value) is not str:
             raise PlanningContractError(f"{self.name} must be a string.")
@@ -205,6 +266,8 @@ class FieldRule:
             if value not in self.enum_values:
                 raise PlanningContractError(f"{self.name} has an unsupported enum value.")
             return value
+        if self.kind is FieldKind.DIGEST:
+            return require_digest(value, self.name)
         return require_ref(value, self.name)
 
 
@@ -233,7 +296,7 @@ class ProjectionContract:
     def rules(self) -> dict[str, FieldRule]:
         return {rule.name: rule for rule in self.field_rules}
 
-    def validate_fields(self, values: Mapping[str, object], *, complete: bool) -> tuple[tuple[str, bool | str], ...]:
+    def validate_fields(self, values: Mapping[str, object], *, complete: bool) -> tuple[tuple[str, bool | str | int], ...]:
         if set(values) - set(self.rules):
             raise PlanningContractError("Projection contains an undeclared field.")
         if complete:
@@ -266,7 +329,7 @@ class AuthoritativeProjection:
     object_ref: str
     observed_at: int
     fresh_until: int
-    fields: tuple[tuple[str, bool | str], ...]
+    fields: tuple[tuple[str, bool | str | int], ...]
     authoritative: bool = True
     complete: bool = True
     contradictory: bool = False
@@ -318,7 +381,7 @@ class AuthoritativeProjection:
         )
 
     @property
-    def values(self) -> dict[str, bool | str]:
+    def values(self) -> dict[str, bool | str | int]:
         return dict(self.fields)
 
     @property
@@ -357,7 +420,7 @@ class DesiredObject:
     object_ref: str
     object_class: ObjectClass
     desired_exists: bool
-    desired_fields: tuple[tuple[str, bool | str], ...]
+    desired_fields: tuple[tuple[str, bool | str | int], ...]
 
     def __post_init__(self) -> None:
         require_ref(self.object_ref, "desired object_ref")
@@ -498,9 +561,9 @@ class ObjectChange:
     object_ref: str
     object_class: ObjectClass
     change_kind: ChangeKind
-    current_fields: tuple[tuple[str, bool | str], ...]
-    proposed_fields: tuple[tuple[str, bool | str], ...]
-    expected_fields: tuple[tuple[str, bool | str], ...]
+    current_fields: tuple[tuple[str, bool | str | int], ...]
+    proposed_fields: tuple[tuple[str, bool | str | int], ...]
+    expected_fields: tuple[tuple[str, bool | str | int], ...]
     current_projection_digest: str
     expected_projection_digest: str
     projection_contract_ref: str
@@ -518,6 +581,16 @@ class ObjectChange:
         require_ref(self.projection_source_ref, "projection_source_ref")
         if self.fresh_until <= self.observed_at:
             raise PlanningContractError("Object change projection freshness is invalid.")
+        for field_name, fields in (
+            ("current_fields", self.current_fields),
+            ("proposed_fields", self.proposed_fields),
+            ("expected_fields", self.expected_fields),
+        ):
+            names = tuple(name for name, _value in fields)
+            if len(names) != len(set(names)) or fields != tuple(sorted(fields)):
+                raise PlanningContractError(
+                    f"Object change {field_name} must be unique and canonically ordered."
+                )
 
     def as_dict(self) -> dict[str, CanonicalValue]:
         return {
@@ -840,8 +913,10 @@ class PreparedPlan:
     lines: tuple[PlanLine, ...]
     dispatchable: bool
     adapter_registry_bound: bool
-    runtime_packaged: bool
-    mcp_exposed: bool
+    planner_runtime_packaged: bool
+    planner_mcp_exposed: bool
+    executor_runtime_packaged: bool
+    executor_mcp_exposed: bool
     plan_digest: str
 
     def canonical_content(self) -> dict[str, CanonicalValue]:
@@ -854,12 +929,14 @@ class PreparedPlan:
             "environment_ref": self.environment_ref,
             "expires_at": self.expires_at,
             "lines": [line.as_dict() for line in self.lines],
-            "mcp_exposed": self.mcp_exposed,
+            "executor_mcp_exposed": self.executor_mcp_exposed,
+            "executor_runtime_packaged": self.executor_runtime_packaged,
             "plan_ref": self.plan_ref,
+            "planner_mcp_exposed": self.planner_mcp_exposed,
+            "planner_runtime_packaged": self.planner_runtime_packaged,
             "registry_schema_version": self.registry_schema_version,
             "requester_digest": self.requester_digest,
             "revision": self.revision,
-            "runtime_packaged": self.runtime_packaged,
             "scheme_id": self.scheme_id.value,
             "scheme_version": self.scheme_version,
             "scope_ref": self.scope_ref,
@@ -880,8 +957,19 @@ class PreparedPlan:
             raise PlanningContractError("Prepared plan digest is invalid.")
         if not self.lines or len(self.lines) > 19:
             raise PlanningContractError("Prepared plan line count is invalid.")
-        if self.dispatchable or self.adapter_registry_bound or self.runtime_packaged or self.mcp_exposed:
-            raise PlanningContractError("M2 prepared plan must remain repository-only and non-executable.")
+        if (
+            self.dispatchable
+            or self.adapter_registry_bound
+            or self.executor_runtime_packaged
+            or self.executor_mcp_exposed
+        ):
+            raise PlanningContractError(
+                "Prepared plan widened the non-executable runtime boundary."
+            )
+        if not self.planner_runtime_packaged:
+            raise PlanningContractError(
+                "Prepared plan does not truthfully declare plan-only packaging."
+            )
 
 
 @dataclass(frozen=True, slots=True)

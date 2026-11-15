@@ -27,3 +27,10 @@ dist/
 build/
 *.egg-info/
 deploy/docker/wheelhouse/
+**/deploy/docker/wheelhouse/
+local-output/
+tmp/
+*.pptx
+/.work/
+
+/docs/CONTINUATION_HISTORY.md

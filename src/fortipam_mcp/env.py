@@ -1,4 +1,4 @@
-"""Central Fortinet-lab environment loading without secret disclosure."""
+"""Operator-controlled environment loading without secret disclosure."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def project_root() -> Path:
 
 
 def load_runtime_environment() -> EnvironmentLoadReport:
-    """Load the central lab secret file when it is locally available.
+    """Load an explicit owner-only environment file or a project-local file.
 
     Explicit process environment values always win. Neither paths nor values are
     returned, logged, or placed in MCP results.
@@ -42,15 +42,6 @@ def load_runtime_environment() -> EnvironmentLoadReport:
     candidates: list[tuple[str, Path]] = []
     if configured:
         candidates.append(("operator_env_file", Path(configured).expanduser()))
-    candidates.append(
-        (
-            "central_lab_secret_file",
-            project_root().parent
-            / "8022_fortinet_lab_inventory"
-            / "secrets"
-            / "fortinet_lab_secrets.local.env",
-        )
-    )
     candidates.append(("project_local_env_file", project_root() / ".env.local"))
 
     for source, path in candidates:
@@ -60,18 +51,31 @@ def load_runtime_environment() -> EnvironmentLoadReport:
     return EnvironmentLoadReport(source="process_environment_only", loaded=False)
 
 
-def load_prefixed_environment_file(path: Path, prefix: str) -> int:
+def load_prefixed_environment_file(
+    path: Path,
+    prefix: str,
+    *,
+    overwrite: bool = False,
+    required_keys: tuple[str, ...] = (),
+) -> int:
     """Load one owner-only dotenv file without executing it.
 
-    Only keys with the requested prefix are imported, and existing process
-    environment values always win. The return value is a count, never a key,
-    path, or secret value.
+    Only keys with the requested prefix are imported. Existing process values
+    win by default; credential-consuming entrypoints may explicitly make their
+    owner-only input file authoritative with ``overwrite=True``. The return
+    value is a count, never a key, path, or secret value. Required keys must
+    exist in the selected file itself before any process values are changed.
     """
 
     _assert_owner_only(path)
+    values = _parse_env_file(path)
+    if any(not key.startswith(prefix) or not values.get(key) for key in required_keys):
+        raise EnvironmentFileError(
+            "Required credential fields are missing from the selected file."
+        )
     loaded = 0
-    for key, value in _parse_env_file(path).items():
-        if key.startswith(prefix) and key not in os.environ:
+    for key, value in values.items():
+        if key.startswith(prefix) and (overwrite or key not in os.environ):
             os.environ[key] = value
             loaded += 1
     return loaded

@@ -3,12 +3,17 @@ from __future__ import annotations
 import copy
 from dataclasses import asdict, replace
 import json
+import os
 from pathlib import Path
 from typing import cast
 
 import pytest
 
 import v4_planning
+from fortipam_mcp.access_domain_projection_source import (
+    SOURCE_REF as ACCESS_DOMAIN_SOURCE_REF,
+    access_domain_projection_contract,
+)
 from scripts.v4_registry import load_registry, validate_registry
 from v4_planning import (
     AuthenticatedRequester,
@@ -20,8 +25,10 @@ from v4_planning import (
     ObjectClass,
     PlanningContractError,
     PlanningDenied,
+    PersistentReferenceAuthority,
     PostWriteStatus,
     PreWriteStatus,
+    ProjectionContract,
     SchemeDraft,
     SchemeId,
     VerifiedConfirmationInteraction,
@@ -53,7 +60,12 @@ class DuplicateIssuer:
 def _promoted_registry() -> dict[str, object]:
     registry = copy.deepcopy(load_registry())
     for scheme in registry["schemes"]:  # type: ignore[index]
-        if scheme["id"] in {"AccessDomainScheme", "SecretOnboardingScheme"}:
+        if scheme["id"] in {
+            "AccessDomainScheme",
+            "ApprovalAndObserveScheme",
+            "IdentityLifecycleScheme",
+            "SecretOnboardingScheme",
+        }:
             scheme["status"] = "planned"
             scheme["maturity"] = "contract_tested"
             scheme["lifecycle"] = "contract_tested"
@@ -69,7 +81,7 @@ def _requester(suffix: str = "alpha") -> AuthenticatedRequester:
 def _desired(
     object_ref: str,
     object_class: ObjectClass,
-    values: dict[str, bool | str],
+    values: dict[str, bool | str | int],
     *,
     exists: bool = True,
 ) -> DesiredObject:
@@ -159,11 +171,7 @@ def _secret_draft() -> SchemeDraft:
             _desired(
                 "secret-metadata-ref01",
                 ObjectClass.SECRET_METADATA,
-                {
-                    "account_type": "local",
-                    "enabled": True,
-                    "lifecycle_class": "managed",
-                },
+                {"inherit_permission": True},
             ),
             _desired(
                 "launcher-binding-ref1",
@@ -194,6 +202,191 @@ def _secret_draft() -> SchemeDraft:
     )
 
 
+def _composite_linux_draft() -> SchemeDraft:
+    draft = _secret_draft()
+    secret_objects = tuple(
+        replace(
+            item,
+            desired_fields=(("folder_ref", "folder-relation-ref01"),),
+        )
+        if item.object_class is ObjectClass.FOLDER_BINDING
+        else item
+        for item in draft.desired_objects
+    )
+    return replace(
+        draft,
+        scope_ref="scope-ref-linux01",
+        desired_objects=(
+            _desired(
+                "folder-relation-ref01",
+                ObjectClass.PUBLIC_FOLDER,
+                {"enabled": True, "owner_ref": draft.owner_ref},
+            ),
+            _desired(
+                "grant-relation-ref001",
+                ObjectClass.ACCESS_GRANT,
+                {
+                    "permission": "use",
+                    "subject_class": "group",
+                    "subject_ref": "group-relation-ref01",
+                },
+            ),
+            *secret_objects,
+        ),
+    )
+
+
+def _windows_rdp_draft() -> SchemeDraft:
+    draft = _secret_draft()
+    desired = list(draft.desired_objects)
+    target = desired[1]
+    desired[1] = replace(
+        target,
+        desired_fields=tuple(
+            sorted(
+                {
+                    "connectivity_profile_ref": "connectivity-profile01",
+                    "protocol": "rdp",
+                }.items()
+            )
+        ),
+    )
+    return replace(
+        draft,
+        blueprint_ref="FPA-BP-006",
+        outcome_code="onboard_windows_rdp_resource",
+        desired_objects=tuple(desired),
+        excluded_scope_codes=(
+            "credential_material",
+            "policy_association",
+            "session_launch",
+        ),
+        verification_codes=(
+            "association_readback",
+            "native_rdp_launcher_profile",
+        ),
+    )
+
+
+def _web_account_draft() -> SchemeDraft:
+    draft = _secret_draft()
+    return replace(
+        draft,
+        blueprint_ref="FPA-BP-007",
+        outcome_code="onboard_web_account",
+        desired_objects=(
+            draft.desired_objects[0],
+            draft.desired_objects[2],
+            _desired(
+                "web-secret-metadata-ref01",
+                ObjectClass.WEB_SECRET_METADATA,
+                {"inherit_permission": True, "session_recording": True},
+            ),
+        ),
+        excluded_scope_codes=("credential_material", "session_launch"),
+        verification_codes=("web_account_relation_readback",),
+    )
+
+
+def _approval_and_observe_draft() -> SchemeDraft:
+    return SchemeDraft(
+        scheme_id=SchemeId.APPROVAL_AND_OBSERVE,
+        scheme_version="1.0.0",
+        registry_schema_version="1.1.0",
+        blueprint_ref="FPA-BP-008",
+        environment_ref="environment-ref-lab01",
+        scope_ref="scope-ref-approval01",
+        owner_ref="owner-ref-team0001",
+        audience_ref="audience-ref-admin01",
+        outcome_code="require_interactive_approval",
+        desired_objects=(
+            _desired(
+                "approval-profile-object-ref01",
+                ObjectClass.APPROVAL_PROFILE_BINDING,
+                {
+                    "profile_mode": "single_tier",
+                    "profile_ref": "approval-profile-ref0001",
+                },
+            ),
+            _desired(
+                "secret-approval-object-ref01",
+                ObjectClass.SECRET_APPROVAL_BINDING,
+                {
+                    "approval_profile_attached": True,
+                    "interactive_approval_required": True,
+                    "job_approval_required": False,
+                    "owner_bypass_allowed": False,
+                },
+            ),
+        ),
+        approval_class="independent_approval",
+        separation_required=True,
+        risk_class="high",
+        external_effects=("interactive_approval_policy_change",),
+        assumption_codes=("single_tier_profile_prevalidated",),
+        excluded_scope_codes=("approval_request", "session_launch"),
+        verification_codes=("secret_approval_relation_readback",),
+        stop_codes=("current_state_drift", "projection_unavailable"),
+        evidence_policy="redacted_contract_evidence",
+        maintenance_class="none",
+        reversibility_class="manual_reconciliation_only",
+        evidence_refs=("evidence-ref-approval01",),
+        unresolved_gap_codes=(),
+        reconciliation_strategy="reconcile_or_manual",
+        summary_ttl_seconds=300,
+    )
+
+
+def _identity_lifecycle_draft() -> SchemeDraft:
+    return SchemeDraft(
+        scheme_id=SchemeId.IDENTITY_LIFECYCLE,
+        scheme_version="1.0.0",
+        registry_schema_version="1.1.0",
+        blueprint_ref="FPA-BP-015",
+        environment_ref="environment-ref-lab01",
+        scope_ref="scope-ref-sponsored01",
+        owner_ref="owner-ref-team0001",
+        audience_ref="audience-ref-admin01",
+        outcome_code="manage_sponsored_group_membership",
+        desired_objects=(
+            _desired(
+                "sponsored-group-object-ref01",
+                ObjectClass.SPONSORED_GROUP,
+                {
+                    "maximum_members": 1,
+                    "sponsor_admin_ref": "sponsor-admin-ref0001",
+                    "sponsor_admin_scope_enforced": True,
+                },
+            ),
+            _desired(
+                "sponsored-member-object-ref01",
+                ObjectClass.SPONSORED_GROUP_MEMBER,
+                {
+                    "member_ref": "sponsored-member-ref001",
+                    "membership_status": "active",
+                    "schedule_ref": "sponsored-schedule-ref01",
+                    "sponsored_group_ref": "sponsored-group-object-ref01",
+                },
+            ),
+        ),
+        approval_class="owner_approval",
+        separation_required=False,
+        risk_class="medium",
+        external_effects=("sponsored_access_metadata_change",),
+        assumption_codes=("sponsor_relationship_prevalidated",),
+        excluded_scope_codes=("credential_material", "runtime_execution"),
+        verification_codes=("sponsored_membership_relation_readback",),
+        stop_codes=("current_state_drift", "projection_unavailable"),
+        evidence_policy="redacted_contract_evidence",
+        maintenance_class="none",
+        reversibility_class="manual_reconciliation_only",
+        evidence_refs=("evidence-ref-sponsored01",),
+        unresolved_gap_codes=(),
+        reconciliation_strategy="reconcile_or_manual",
+        summary_ttl_seconds=300,
+    )
+
+
 _OBJECT_KIND = {
     ObjectClass.PUBLIC_FOLDER: "public_folder",
     ObjectClass.ACCESS_GRANT: "access_grant",
@@ -203,17 +396,35 @@ _OBJECT_KIND = {
     ObjectClass.TARGET: "target",
     ObjectClass.TEMPLATE_BINDING: "template_binding",
     ObjectClass.SECRET_METADATA: "secret_metadata",
+    ObjectClass.WEB_SECRET_METADATA: "web_secret_metadata",
+    ObjectClass.DOMAIN_TARGET_BINDING: "domain_target_binding",
+    ObjectClass.DOMAIN_SECRET_METADATA: "domain_secret_metadata",
+    ObjectClass.WEB_TARGET_BINDING: "web_target_binding",
+    ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA: "target_bound_web_secret_metadata",
+    ObjectClass.WINRM_COLLECTOR_METADATA: "winrm_collector_metadata",
     ObjectClass.LAUNCHER_BINDING: "launcher_binding",
     ObjectClass.POLICY_BINDING: "policy_binding",
+    ObjectClass.APPROVAL_PROFILE_BINDING: "approval_profile_binding",
+    ObjectClass.SECRET_APPROVAL_BINDING: "secret_approval_binding",
+    ObjectClass.RDP_EVENT_FILTER_BINDING: "rdp_event_filter_binding",
+    ObjectClass.SECRET_SESSION_CONTROLS_BINDING: "secret_session_controls_binding",
+    ObjectClass.WEB_SECRET_SERVICE_BINDING: "web_secret_service_binding",
+    ObjectClass.SPONSORED_GROUP: "sponsored_group",
+    ObjectClass.SPONSORED_GROUP_MEMBER: "sponsored_group_member",
 }
 
 
 class Authorizer:
     authority_ref = "m2-fake-reference-authority"
 
-    def __init__(self, drafts: tuple[SchemeDraft, ...]) -> None:
+    def __init__(
+        self,
+        drafts: tuple[SchemeDraft, ...],
+        *,
+        projection_source_ref: str = "m2-fake-projection-source",
+    ) -> None:
         self._grants: set[tuple[str, str]] = {
-            ("m2-fake-projection-source", "projection_source")
+            (projection_source_ref, "projection_source")
         }
         for draft in drafts:
             self._grants.update(
@@ -319,7 +530,7 @@ def _projection(
     engine: M2PlanningEngine,
     scheme_id: SchemeId,
     desired: DesiredObject,
-    values: dict[str, bool | str],
+    values: dict[str, bool | str | int],
     *,
     observed_at: int = NOW - 10,
     fresh_until: int = NOW + 100,
@@ -392,7 +603,7 @@ def _confirmed_plan(
     v4_planning.PreparedPlan,
     list[AuthoritativeProjection],
 ]:
-    engine = _engine()
+    engine = _engine(draft)
     requester = _requester()
     current = _absent_projections(engine, draft)
     summary = engine.compile_summary(draft, requester, current, now_epoch=NOW)
@@ -411,8 +622,13 @@ def _confirmed_plan(
     return engine, requester, summary, plan, current
 
 
-@pytest.mark.parametrize("draft", [_access_draft(), _secret_draft()])
-def test_m2_compiles_confirmed_non_executable_plan_for_two_schemes(draft: SchemeDraft) -> None:
+@pytest.mark.parametrize(
+    "draft",
+    [_access_draft(), _secret_draft(), _windows_rdp_draft(), _web_account_draft()],
+)
+def test_m2_compiles_confirmed_non_executable_plan_for_supported_profiles(
+    draft: SchemeDraft,
+) -> None:
     engine, _requester_value, summary, plan, current = _confirmed_plan(draft)
 
     assert summary.as_dict()["state"] == "awaiting_confirmation"
@@ -426,8 +642,10 @@ def test_m2_compiles_confirmed_non_executable_plan_for_two_schemes(draft: Scheme
     assert plan.state.value == "prepared_non_executable"
     assert plan.dispatchable is False
     assert plan.adapter_registry_bound is False
-    assert plan.runtime_packaged is False
-    assert plan.mcp_exposed is False
+    assert plan.planner_runtime_packaged is True
+    assert plan.planner_mcp_exposed is False
+    assert plan.executor_runtime_packaged is False
+    assert plan.executor_mcp_exposed is False
     assert all(line.dispatchable is False and line.adapter == "none" for line in plan.lines)
 
     reread = [
@@ -452,11 +670,232 @@ def test_m2_compiles_confirmed_non_executable_plan_for_two_schemes(draft: Scheme
     assert postwrite.operational_success is False
 
 
+def test_approval_scheme_plans_only_the_existing_secret_policy_update() -> None:
+    draft = _approval_and_observe_draft()
+    engine = _engine(draft)
+    profile, secret = draft.desired_objects
+    current = [
+        _projection(
+            engine,
+            draft.scheme_id,
+            profile,
+            {"exists": True, **dict(profile.desired_fields)},
+        ),
+        _projection(
+            engine,
+            draft.scheme_id,
+            secret,
+            {
+                "exists": True,
+                "approval_profile_attached": False,
+                "interactive_approval_required": False,
+                "job_approval_required": False,
+                "owner_bypass_allowed": False,
+            },
+        ),
+    ]
+    requester = _requester()
+    summary = engine.compile_summary(draft, requester, current, now_epoch=NOW)
+    confirmation = engine.confirm_intent(
+        summary.summary_ref,
+        requester,
+        _interaction(summary, requester),
+        now_epoch=NOW + 1,
+    )
+    plan = engine.prepare_plan(
+        summary.summary_ref,
+        confirmation.confirmation_ref,
+        requester,
+        now_epoch=NOW + 2,
+    )
+
+    assert len(plan.lines) == 1
+    assert plan.lines[0].target_class is ObjectClass.SECRET_APPROVAL_BINDING
+    assert plan.lines[0].change_kind is ChangeKind.UPDATE
+    assert plan.dispatchable is False
+
+
 def test_access_domain_plan_has_folder_before_grant_dependency() -> None:
     _engine, _requester_value, _summary, plan, _current = _confirmed_plan(_access_draft())
     folder = next(line for line in plan.lines if line.target_class is ObjectClass.PUBLIC_FOLDER)
     grant = next(line for line in plan.lines if line.target_class is ObjectClass.ACCESS_GRANT)
     assert grant.depends_on == (folder.line_ref,)
+
+
+@pytest.mark.parametrize("value", [1, 2_147_483_647])
+def test_positive_integer_field_accepts_only_bounded_positive_ints(value: int) -> None:
+    from v4_planning.models import FieldKind, FieldRule
+
+    assert FieldRule("maximum_members", FieldKind.POSITIVE_INTEGER).validate(value) == value
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 2_147_483_648, "1"])
+def test_positive_integer_field_rejects_boolean_and_invalid_bounds(value: object) -> None:
+    from v4_planning.models import FieldKind, FieldRule
+
+    with pytest.raises(PlanningContractError, match="bounded positive integer"):
+        FieldRule("maximum_members", FieldKind.POSITIVE_INTEGER).validate(value)
+
+
+def test_identity_lifecycle_plan_uses_identity_projection_and_group_member_dependency() -> None:
+    draft = _identity_lifecycle_draft()
+    engine, _requester_value, summary, plan, _current = _confirmed_plan(draft)
+
+    group = next(
+        line for line in plan.lines if line.target_class is ObjectClass.SPONSORED_GROUP
+    )
+    member = next(
+        line
+        for line in plan.lines
+        if line.target_class is ObjectClass.SPONSORED_GROUP_MEMBER
+    )
+    assert summary.scheme_id is SchemeId.IDENTITY_LIFECYCLE
+    assert dict(summary.object_changes[0].expected_fields)["maximum_members"] == 1
+    assert member.depends_on == (group.line_ref,)
+    assert all(line.dispatchable is False for line in plan.lines)
+    assert engine.projection_contract(
+        SchemeId.IDENTITY_LIFECYCLE, ObjectClass.SPONSORED_GROUP
+    ).contract_id == "identity-lifecycle-state-v1"
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ["shape", "group_ref", "status", "scope", "material"],
+)
+def test_identity_lifecycle_rejects_expanded_or_invalid_fixed_profile(mode: str) -> None:
+    draft = _identity_lifecycle_draft()
+    group, member = draft.desired_objects
+    if mode == "shape":
+        draft = replace(draft, desired_objects=(group,))
+    elif mode == "group_ref":
+        draft = replace(
+            draft,
+            desired_objects=(
+                group,
+                replace(
+                    member,
+                    desired_fields=tuple(
+                        sorted(
+                            {
+                                **dict(member.desired_fields),
+                                "sponsored_group_ref": "another-group-object-ref01",
+                            }.items()
+                        )
+                    ),
+                ),
+            ),
+        )
+    elif mode == "status":
+        draft = replace(
+            draft,
+            desired_objects=(
+                group,
+                replace(
+                    member,
+                    desired_fields=tuple(
+                        sorted(
+                            {
+                                **dict(member.desired_fields),
+                                "membership_status": "pending",
+                            }.items()
+                        )
+                    ),
+                ),
+            ),
+        )
+    elif mode == "scope":
+        draft = replace(
+            draft,
+            desired_objects=(
+                replace(
+                    group,
+                    desired_fields=tuple(
+                        sorted(
+                            {
+                                **dict(group.desired_fields),
+                                "sponsor_admin_scope_enforced": False,
+                            }.items()
+                        )
+                    ),
+                ),
+                member,
+            ),
+        )
+    else:
+        draft = replace(
+            draft,
+            material_reference_metadata=MaterialReferenceMetadata(
+                provider_class="external_vault_lease",
+                purpose="initial_onboarding",
+                lifecycle="available",
+            ),
+        )
+    engine = _engine(draft)
+    with pytest.raises(PlanningContractError):
+        engine.compile_summary(
+            draft, _requester(), _absent_projections(engine, draft), now_epoch=NOW
+        )
+
+
+def test_identity_lifecycle_exact_profile_rejects_other_registered_blueprints() -> None:
+    draft = replace(
+        _identity_lifecycle_draft(),
+        blueprint_ref="FPA-BP-002",
+        outcome_code="create_local_identity",
+    )
+    engine = _engine(draft)
+    with pytest.raises(PlanningDenied, match="exact registered M2 profile"):
+        engine.compile_summary(
+            draft, _requester(), _absent_projections(engine, draft), now_epoch=NOW
+        )
+
+
+def test_engine_uses_only_an_explicitly_injected_source_backed_contract() -> None:
+    draft = _access_draft()
+
+    def access_only_contract(
+        scheme_id: SchemeId,
+        object_class: ObjectClass,
+    ) -> ProjectionContract:
+        if scheme_id is not SchemeId.ACCESS_DOMAIN:
+            raise PlanningDenied("Source-backed contract is unavailable for this Scheme.")
+        return access_domain_projection_contract(object_class)
+
+    engine = M2PlanningEngine(
+        _promoted_registry(),
+        Issuer(),
+        Authorizer((draft,), projection_source_ref=ACCESS_DOMAIN_SOURCE_REF),
+        projection_contract_resolver=access_only_contract,
+    )
+
+    contract = engine.projection_contract(
+        SchemeId.ACCESS_DOMAIN, ObjectClass.PUBLIC_FOLDER
+    )
+
+    assert contract.source_ref == ACCESS_DOMAIN_SOURCE_REF
+    assert contract.contract_id == "fortipam-access-domain-folder-observation-v1"
+    summary = engine.compile_summary(
+        draft,
+        _requester(),
+        _absent_projections(engine, draft),
+        now_epoch=NOW,
+    )
+    assert {
+        change.projection_source_ref for change in summary.object_changes
+    } == {ACCESS_DOMAIN_SOURCE_REF}
+
+    mismatched = M2PlanningEngine(
+        _promoted_registry(),
+        Issuer(),
+        Authorizer((draft,)),
+        projection_contract_resolver=lambda _scheme_id, _object_class: (
+            access_domain_projection_contract(ObjectClass.ACCESS_GRANT)
+        ),
+    )
+    with pytest.raises(PlanningDenied, match="does not match"):
+        mismatched.projection_contract(
+            SchemeId.ACCESS_DOMAIN, ObjectClass.PUBLIC_FOLDER
+        )
 
 
 def test_secret_plan_has_bounded_dependency_dag() -> None:
@@ -466,6 +905,144 @@ def test_secret_plan_has_bounded_dependency_dag() -> None:
     assert len(plan.lines) == 5
     assert len(secret.depends_on) == 3
     assert launch.depends_on == (secret.line_ref,)
+
+
+def test_existing_domain_linux_onboarding_uses_one_summary_confirmation_and_plan() -> None:
+    draft = _composite_linux_draft()
+    engine = _engine(draft)
+    requester = _requester()
+    current = [
+        _projection(
+            engine,
+            draft.scheme_id,
+            desired,
+            (
+                {"exists": False}
+                if desired.object_class
+                in {ObjectClass.ACCESS_GRANT, ObjectClass.SECRET_METADATA}
+                else {"exists": True, **dict(desired.desired_fields)}
+            ),
+        )
+        for desired in draft.desired_objects
+    ]
+
+    summary = engine.compile_summary(draft, requester, current, now_epoch=NOW)
+    confirmation = engine.confirm_intent(
+        summary.summary_ref,
+        requester,
+        _interaction(summary, requester),
+        now_epoch=NOW + 1,
+    )
+    plan = engine.prepare_plan(
+        summary.summary_ref,
+        confirmation.confirmation_ref,
+        requester,
+        now_epoch=NOW + 2,
+    )
+
+    assert summary.scheme_id is SchemeId.SECRET_ONBOARDING
+    assert len(plan.lines) == 2
+    grant = next(
+        line for line in plan.lines if line.target_class is ObjectClass.ACCESS_GRANT
+    )
+    secret = next(
+        line for line in plan.lines if line.target_class is ObjectClass.SECRET_METADATA
+    )
+    assert grant.depends_on == ()
+    assert secret.depends_on == (grant.line_ref,)
+    assert plan.confirmation_ref == confirmation.confirmation_ref
+
+
+def test_new_domain_linux_onboarding_collapses_folder_binding_into_folder_create() -> None:
+    draft = _composite_linux_draft()
+    engine = _engine(draft)
+    requester = _requester()
+    current = [
+        _projection(
+            engine,
+            draft.scheme_id,
+            desired,
+            (
+                {"exists": False}
+                if desired.object_class
+                in {
+                    ObjectClass.PUBLIC_FOLDER,
+                    ObjectClass.FOLDER_BINDING,
+                    ObjectClass.ACCESS_GRANT,
+                    ObjectClass.SECRET_METADATA,
+                }
+                else {"exists": True, **dict(desired.desired_fields)}
+            ),
+        )
+        for desired in draft.desired_objects
+    ]
+
+    summary = engine.compile_summary(draft, requester, current, now_epoch=NOW)
+    confirmation = engine.confirm_intent(
+        summary.summary_ref,
+        requester,
+        _interaction(summary, requester),
+        now_epoch=NOW + 1,
+    )
+    plan = engine.prepare_plan(
+        summary.summary_ref,
+        confirmation.confirmation_ref,
+        requester,
+        now_epoch=NOW + 2,
+    )
+
+    assert any(
+        change.object_class is ObjectClass.FOLDER_BINDING
+        and change.change_kind is ChangeKind.CREATE
+        for change in summary.object_changes
+    )
+    assert {line.target_class for line in plan.lines} == {
+        ObjectClass.PUBLIC_FOLDER,
+        ObjectClass.ACCESS_GRANT,
+        ObjectClass.SECRET_METADATA,
+    }
+    folder = next(
+        line for line in plan.lines if line.target_class is ObjectClass.PUBLIC_FOLDER
+    )
+    grant = next(
+        line for line in plan.lines if line.target_class is ObjectClass.ACCESS_GRANT
+    )
+    secret = next(
+        line for line in plan.lines if line.target_class is ObjectClass.SECRET_METADATA
+    )
+    assert folder.depends_on == ()
+    assert grant.depends_on == (folder.line_ref,)
+    assert set(secret.depends_on) == {folder.line_ref, grant.line_ref}
+
+
+def test_composite_linux_onboarding_rejects_unrelated_folder_binding() -> None:
+    draft = _composite_linux_draft()
+    folder_binding = next(
+        item
+        for item in draft.desired_objects
+        if item.object_class is ObjectClass.FOLDER_BINDING
+    )
+    altered = replace(
+        draft,
+        desired_objects=tuple(
+            replace(
+                item,
+                desired_fields=(("folder_ref", "different-folder-reference"),),
+            )
+            if item is folder_binding
+            else item
+            for item in draft.desired_objects
+        ),
+    )
+    engine = _engine(altered)
+
+    with pytest.raises(PlanningDenied, match="Folder relation"):
+        engine.compile_summary(
+            altered,
+            _requester(),
+            _absent_projections(engine, altered),
+            now_epoch=NOW,
+        )
 
 
 def test_summary_digest_is_deterministic_for_same_server_refs_and_time() -> None:
@@ -1000,6 +1577,63 @@ def test_reference_authorization_expiry_caps_summary_and_plan() -> None:
     assert plan.expires_at == NOW + 10
 
 
+def test_persistent_reference_authority_integrates_with_planning_engine(
+    tmp_path: Path,
+) -> None:
+    os.chmod(tmp_path, 0o700)
+    key = tmp_path / "reference-authority.hmac"
+    key.write_bytes(b"p" * 32)
+    os.chmod(key, 0o600)
+    authority = PersistentReferenceAuthority(
+        tmp_path / "reference-authority.sqlite3",
+        key,
+        authority_ref="protected-reference-authority-ref01",
+        clock=lambda: NOW,
+    )
+    draft = _access_draft()
+    requester = _requester()
+    reference_grants: set[tuple[str, str]] = {
+        ("m2-fake-projection-source", "projection_source"),
+        (draft.environment_ref, "environment"),
+        (draft.scope_ref, "scope"),
+        (draft.owner_ref, "owner"),
+        (draft.audience_ref, "audience"),
+        *((reference, "evidence") for reference in draft.evidence_refs),
+    }
+    for desired in draft.desired_objects:
+        reference_grants.add(
+            (desired.object_ref, f"object_{_OBJECT_KIND[desired.object_class]}")
+        )
+        reference_grants.update(
+            (value, f"field_{field}")
+            for field, value in desired.desired_fields
+            if field.endswith("_ref") and type(value) is str
+        )
+    for reference, reference_kind in sorted(reference_grants):
+        authority.issue(
+            reference,
+            reference_kind=reference_kind,
+            requester_digest=requester.digest,
+            environment_ref=draft.environment_ref,
+            scope_ref=draft.scope_ref,
+            expires_at=NOW + 120,
+            now_epoch=NOW,
+        )
+    engine = M2PlanningEngine(_promoted_registry(), Issuer(), authority)
+
+    summary = engine.compile_summary(
+        draft,
+        requester,
+        _absent_projections(engine, draft),
+        now_epoch=NOW,
+    )
+
+    assert summary.reference_authority_ref == authority.authority_ref
+    assert summary.reference_authorization_digest
+    assert summary.reference_authorization_expires_at == NOW + 60
+    assert summary.expires_at == NOW + 60
+
+
 def test_reference_revocation_invalidates_summary_before_confirmation() -> None:
     draft = _access_draft()
     authorizer = StatefulAuthorizer((draft,))
@@ -1196,13 +1830,13 @@ def test_c3_locator_cannot_enter_material_metadata_or_scheme() -> None:
         assert prohibited not in serialized
 
 
-def test_m2_has_no_apply_execute_or_adapter_surface_and_is_not_in_v3_wheel() -> None:
+def test_v4_wheel_packages_planner_without_apply_execute_or_adapter_surface() -> None:
     assert not hasattr(M2PlanningEngine, "apply")
     assert not hasattr(M2PlanningEngine, "execute")
     assert not hasattr(M2PlanningEngine, "register_adapter")
     pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'packages = ["src/fortipam_mcp"]' in pyproject
-    assert "v4_planning" not in pyproject
+    assert 'packages = ["src/fortipam_mcp", "v4_planning"]' in pyproject
+    assert "product_executor" not in pyproject
 
 
 def test_unpromoted_registry_cannot_construct_m2_engine() -> None:
@@ -1217,6 +1851,30 @@ def test_unpromoted_registry_cannot_construct_m2_engine() -> None:
     scheme["lifecycle"] = "catalogued"
     scheme["implementation_evidence"]["evidence_status"] = "pending"
     with pytest.raises(PlanningDenied, match="not contract-tested"):
+        M2PlanningEngine(registry, Issuer(), Authorizer(()))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("read_only", False),
+        ("raw_responses_returned", True),
+        ("product_selectors_returned", True),
+    ),
+)
+def test_source_backed_registry_requires_safe_projection_evidence(
+    field: str,
+    value: bool,
+) -> None:
+    registry = copy.deepcopy(load_registry())
+    scheme = next(
+        item
+        for item in registry["schemes"]  # type: ignore[index]
+        if item["id"] == "AccessDomainScheme"
+    )
+    scheme["implementation_evidence"]["projection_profile"][field] = value
+
+    with pytest.raises(PlanningDenied, match="not safely registered"):
         M2PlanningEngine(registry, Issuer(), Authorizer(()))
 
 
@@ -1235,8 +1893,8 @@ def test_previous_registry_schema_version_is_denied_after_p01_extension() -> Non
 def test_uncontracted_blueprint_or_outcome_profile_is_denied() -> None:
     engine = _engine()
     requester = _requester()
-    wrong_blueprint = replace(_secret_draft(), blueprint_ref="FPA-BP-006")
-    with pytest.raises(PlanningDenied, match="exact fake-only M2 profile"):
+    wrong_blueprint = replace(_secret_draft(), blueprint_ref="FPA-BP-007")
+    with pytest.raises(PlanningDenied, match="exact registered M2 profile"):
         engine.compile_summary(
             wrong_blueprint,
             requester,
@@ -1244,7 +1902,7 @@ def test_uncontracted_blueprint_or_outcome_profile_is_denied() -> None:
             now_epoch=NOW,
         )
     wrong_outcome = replace(_access_draft(), outcome_code="grant_unbounded_access")
-    with pytest.raises(PlanningDenied, match="exact fake-only M2 profile"):
+    with pytest.raises(PlanningDenied, match="exact registered M2 profile"):
         engine.compile_summary(
             wrong_outcome,
             requester,
@@ -1265,3 +1923,390 @@ def test_duplicate_server_reference_is_denied_before_record_overwrite() -> None:
             _absent_projections(engine, draft),
             now_epoch=NOW + 1,
         )
+
+
+def _existing_secret_controls_draft() -> SchemeDraft:
+    from fortipam_mcp.secret_metadata_http_transport import secret_session_controls_event_filter_profile_digest
+    draft = _secret_draft()
+    objects = tuple(
+        replace(item, desired_fields=tuple(sorted({
+            **dict(item.desired_fields), "protocol": "rdp",
+        }.items()))) if item.object_class is ObjectClass.TARGET else item
+        for item in draft.desired_objects
+        if item.object_class is not ObjectClass.LAUNCHER_BINDING
+    )
+    return replace(
+        draft,
+        blueprint_ref="FPA-BP-006",
+        outcome_code="onboard_windows_rdp_resource",
+        material_reference_metadata=None,
+        desired_objects=objects + (
+            _desired("event-filter-object-ref01", ObjectClass.RDP_EVENT_FILTER_BINDING,
+                     {"profile_ref": "event-filter-profile-ref01"}),
+            _desired("secret-controls-object-ref01", ObjectClass.SECRET_SESSION_CONTROLS_BINDING,
+                     {"recording_enabled": True, "clipboard_blocking_enabled": True,
+                      "rdp_event_filter_enabled": True, "rdp_event_filter_profile_matches": True,
+                      "profile_ref": "event-filter-profile-ref01",
+                      "preserved_identity_digest": "1" * 64,
+                      "event_filter_profile_digest": secret_session_controls_event_filter_profile_digest("mcp-v4-rdp-event-filter-existing01")}),
+        ),
+    )
+
+
+def _existing_controls_projections(engine, draft):
+    from fortipam_mcp.secret_metadata_http_transport import secret_session_controls_event_filter_profile_digest
+    return [
+        _projection(engine, draft.scheme_id, item, {
+            "exists": True, **dict(item.desired_fields),
+            **({"clipboard_blocking_enabled": False, "rdp_event_filter_enabled": False,
+                "rdp_event_filter_profile_matches": False,
+                "event_filter_profile_digest": secret_session_controls_event_filter_profile_digest("mcp-v4-rdp-event-filter-existing00")}
+               if item.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING else {}),
+        })
+        for item in draft.desired_objects
+    ]
+
+
+def test_existing_secret_controls_plans_only_fixed_update_without_material() -> None:
+    draft = _existing_secret_controls_draft()
+    engine = _engine(draft)
+    requester = _requester()
+    summary = engine.compile_summary(draft, requester, _existing_controls_projections(engine, draft), now_epoch=NOW)
+    confirmation = engine.confirm_intent(summary.summary_ref, requester, _interaction(summary, requester), now_epoch=NOW + 1)
+    plan = engine.prepare_plan(summary.summary_ref, confirmation.confirmation_ref, requester, now_epoch=NOW + 2)
+    assert len(plan.lines) == 1
+    assert plan.lines[0].target_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING
+    assert plan.lines[0].change_kind is ChangeKind.UPDATE
+    change = next(item for item in summary.object_changes if item.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING)
+    assert "recording_enabled" not in dict(change.proposed_fields)
+    assert dict(change.current_fields)["recording_enabled"] is True
+
+
+@pytest.mark.parametrize("mode", ["missing_secret", "changed_relation", "material", "disable", "wrong_blueprint", "profile_mismatch"])
+def test_existing_secret_controls_rejects_creation_or_expanded_intent(mode: str) -> None:
+    draft = _existing_secret_controls_draft()
+    if mode == "material":
+        draft = replace(draft, material_reference_metadata=_secret_draft().material_reference_metadata)
+    elif mode == "wrong_blueprint":
+        draft = replace(draft, blueprint_ref="FPA-BP-005", outcome_code="onboard_privileged_resource")
+    elif mode in {"disable", "profile_mismatch"}:
+        draft = replace(draft, desired_objects=tuple(
+            replace(item, desired_fields=tuple(sorted({
+                **dict(item.desired_fields),
+                **({"recording_enabled": False} if mode == "disable" else {"profile_ref": "different-profile-ref01"}),
+            }.items()))) if item.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING else item
+            for item in draft.desired_objects
+        ))
+    engine = _engine(draft)
+    current = _existing_controls_projections(engine, draft)
+    if mode in {"missing_secret", "changed_relation"}:
+        desired = next(item for item in draft.desired_objects if item.object_class is ObjectClass.SECRET_METADATA)
+        current = [
+            _projection(engine, draft.scheme_id, desired,
+                        {"exists": False} if mode == "missing_secret" else {"exists": True, "inherit_permission": False})
+            if item.object_ref == desired.object_ref else item for item in current
+        ]
+    with pytest.raises(PlanningDenied):
+        engine.compile_summary(draft, _requester(), current, now_epoch=NOW)
+
+
+@pytest.mark.parametrize("value", ["not-a-digest", "A" * 64, "1" * 63, True, 1])
+def test_digest_projection_field_rejects_noncanonical_values(value: object) -> None:
+    from v4_planning.models import FieldKind, FieldRule
+    with pytest.raises(PlanningContractError):
+        FieldRule("preserved_identity_digest", FieldKind.DIGEST).validate(value)
+
+
+def test_existing_controls_rejects_identity_drift_in_preview() -> None:
+    draft = _existing_secret_controls_draft()
+    engine = _engine(draft)
+    current = _existing_controls_projections(engine, draft)
+    desired = next(item for item in draft.desired_objects if item.object_class is ObjectClass.SECRET_SESSION_CONTROLS_BINDING)
+    current = [
+        _projection(engine, draft.scheme_id, desired, {**dict(item.fields), "preserved_identity_digest": "2" * 64})
+        if item.object_ref == desired.object_ref else item for item in current
+    ]
+    with pytest.raises(PlanningDenied):
+        engine.compile_summary(draft, _requester(), current, now_epoch=NOW)
+
+
+def _existing_web_service_draft() -> SchemeDraft:
+    draft = _web_account_draft()
+    return replace(
+        draft,
+        material_reference_metadata=None,
+        desired_objects=draft.desired_objects + (
+            _desired(
+                "web-secret-service-object-ref01",
+                ObjectClass.WEB_SECRET_SERVICE_BINDING,
+                {"http_service_enabled": True},
+            ),
+        ),
+    )
+
+
+def _existing_web_service_projections(engine, draft):
+    return [
+        _projection(
+            engine,
+            draft.scheme_id,
+            item,
+            {
+                "exists": True,
+                **dict(item.desired_fields),
+                **(
+                    {"http_service_enabled": False}
+                    if item.object_class is ObjectClass.WEB_SECRET_SERVICE_BINDING
+                    else {}
+                ),
+            },
+        )
+        for item in draft.desired_objects
+    ]
+
+
+def test_existing_web_secret_service_plans_only_fixed_update_without_material() -> None:
+    draft = _existing_web_service_draft()
+    engine = _engine(draft)
+    requester = _requester()
+    summary = engine.compile_summary(
+        draft, requester, _existing_web_service_projections(engine, draft), now_epoch=NOW
+    )
+    confirmation = engine.confirm_intent(
+        summary.summary_ref, requester, _interaction(summary, requester), now_epoch=NOW + 1
+    )
+    plan = engine.prepare_plan(
+        summary.summary_ref, confirmation.confirmation_ref, requester, now_epoch=NOW + 2
+    )
+    assert len(plan.lines) == 1
+    assert plan.lines[0].target_class is ObjectClass.WEB_SECRET_SERVICE_BINDING
+    assert plan.lines[0].change_kind is ChangeKind.UPDATE
+    assert plan.lines[0].depends_on == ()
+
+
+@pytest.mark.parametrize("mode", ["material", "disable", "missing_web", "wrong_blueprint"])
+def test_existing_web_secret_service_rejects_expanded_intent(mode: str) -> None:
+    draft = _existing_web_service_draft()
+    if mode == "material":
+        draft = replace(draft, material_reference_metadata=_secret_draft().material_reference_metadata)
+    elif mode == "disable":
+        draft = replace(draft, desired_objects=tuple(
+            replace(item, desired_fields=(("http_service_enabled", False),))
+            if item.object_class is ObjectClass.WEB_SECRET_SERVICE_BINDING else item
+            for item in draft.desired_objects
+        ))
+    elif mode == "wrong_blueprint":
+        draft = replace(draft, blueprint_ref="FPA-BP-005", outcome_code="onboard_privileged_resource")
+    engine = _engine(draft)
+    current = _existing_web_service_projections(engine, draft)
+    if mode == "missing_web":
+        metadata = next(
+            item for item in draft.desired_objects
+            if item.object_class is ObjectClass.WEB_SECRET_METADATA
+        )
+        current = [
+            _projection(engine, draft.scheme_id, metadata, {"exists": False})
+            if item.object_ref == metadata.object_ref else item
+            for item in current
+        ]
+    with pytest.raises(PlanningDenied):
+        engine.compile_summary(draft, _requester(), current, now_epoch=NOW)
+
+
+def _winrm_collector_draft() -> SchemeDraft:
+    draft = _windows_rdp_draft()
+    objects = tuple(item for item in draft.desired_objects if item.object_class in {
+        ObjectClass.FOLDER_BINDING, ObjectClass.TARGET, ObjectClass.TEMPLATE_BINDING,
+    })
+    return replace(draft, desired_objects=objects + (_desired(
+        "winrm-collector-object-ref01", ObjectClass.WINRM_COLLECTOR_METADATA,
+        {"inherit_permission": True, "privileged_account": True,
+         "owner_only_folder": True, "rdp_service_enabled": True,
+         "recording_enabled": True, "rdp_event_filter_enabled": True,
+         "rdp_event_filter_profile_matches": True,
+         "non_rdp_services_disabled": True, "target_association_matches": True},
+    ),))
+
+
+def _collector_projections(engine, draft):
+    return [_projection(engine, draft.scheme_id, item,
+        {"exists": False} if item.object_class is ObjectClass.WINRM_COLLECTOR_METADATA
+        else {"exists": True, **dict(item.desired_fields)})
+        for item in draft.desired_objects]
+
+
+def test_winrm_collector_plan_explicitly_binds_privilege_without_second_write() -> None:
+    draft = _winrm_collector_draft()
+    engine = _engine(draft)
+    requester = _requester()
+    summary = engine.compile_summary(draft, requester, _collector_projections(engine, draft), now_epoch=NOW)
+    confirmation = engine.confirm_intent(summary.summary_ref, requester, _interaction(summary, requester), now_epoch=NOW + 1)
+    plan = engine.prepare_plan(summary.summary_ref, confirmation.confirmation_ref, requester, now_epoch=NOW + 2)
+    assert len(plan.lines) == 1
+    assert plan.lines[0].target_class is ObjectClass.WINRM_COLLECTOR_METADATA
+    assert plan.lines[0].change_kind is ChangeKind.CREATE
+    change = next(c for c in summary.object_changes if c.object_class is ObjectClass.WINRM_COLLECTOR_METADATA)
+    assert dict(change.proposed_fields)["privileged_account"] is True
+    assert dict(change.proposed_fields)["owner_only_folder"] is True
+    assert plan.dispatchable is False
+
+
+@pytest.mark.parametrize("field", [
+    "inherit_permission", "privileged_account", "owner_only_folder",
+    "rdp_service_enabled", "recording_enabled", "rdp_event_filter_enabled",
+    "rdp_event_filter_profile_matches", "non_rdp_services_disabled",
+    "target_association_matches",
+])
+def test_winrm_collector_rejects_weakened_intent(field: str) -> None:
+    draft = _winrm_collector_draft()
+    item = draft.desired_objects[-1]
+    draft = replace(draft, desired_objects=draft.desired_objects[:-1] + (
+        replace(item, desired_fields=tuple(sorted({**dict(item.desired_fields), field: False}.items()))),
+    ))
+    engine = _engine(draft)
+    with pytest.raises(PlanningDenied, match="isolated fixed profile"):
+        engine.compile_summary(draft, _requester(), _collector_projections(engine, draft), now_epoch=NOW)
+
+
+@pytest.mark.parametrize("mode", ["missing_folder", "convert_existing", "launcher", "wrong_blueprint", "no_material"])
+def test_winrm_collector_rejects_expanded_or_incomplete_scope(mode: str) -> None:
+    draft = _winrm_collector_draft()
+    if mode == "launcher":
+        draft = replace(draft, desired_objects=draft.desired_objects + (_desired(
+            "launcher-collector-ref01", ObjectClass.LAUNCHER_BINDING,
+            {"launcher_profile_ref": "launcher-profile-ref1"},
+        ),))
+    elif mode == "wrong_blueprint":
+        draft = replace(draft, blueprint_ref="FPA-BP-005", outcome_code="onboard_privileged_resource")
+    elif mode == "no_material":
+        draft = replace(draft, material_reference_metadata=None)
+    engine = _engine(draft)
+    projections = _collector_projections(engine, draft)
+    if mode == "missing_folder":
+        item = draft.desired_objects[0]
+        projections[0] = _projection(engine, draft.scheme_id, item, {"exists": False})
+    elif mode == "convert_existing":
+        item = draft.desired_objects[-1]
+        projections[-1] = _projection(engine, draft.scheme_id, item, {
+            "exists": True, **dict(item.desired_fields), "privileged_account": False,
+        })
+    with pytest.raises(PlanningDenied):
+        engine.compile_summary(draft, _requester(), projections, now_epoch=NOW)
+
+
+def _target_bound_web_draft() -> SchemeDraft:
+    draft = _web_account_draft()
+    return replace(draft, desired_objects=(
+        *draft.desired_objects[:2],
+        _desired(
+            "web-target-binding-ref01", ObjectClass.WEB_TARGET_BINDING,
+            {"profile_ref": "web-target-profile-ref01", "target_relation_matches": True},
+        ),
+        _desired(
+            "target-bound-web-secret-ref01", ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA,
+            {
+                "inherit_permission": True, "session_recording": True,
+                "http_service_enabled": True, "proxy_mode_enabled": True,
+                "target_association_matches": True,
+            },
+        ),
+    ))
+
+
+def _target_bound_web_projections(engine, draft, *, exists=False):
+    return [
+        _projection(
+            engine, draft.scheme_id, item,
+            {"exists": False}
+            if item.object_class is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA and not exists
+            else {"exists": True, **dict(item.desired_fields)},
+        )
+        for item in draft.desired_objects
+    ]
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_target_bound_web_plans_create_or_noop_with_fixed_dependencies(exists):
+    from fortipam_mcp.secret_onboarding_projection_source import secret_onboarding_projection_contract
+
+    draft = _target_bound_web_draft()
+    authorizer = Authorizer((draft,), projection_source_ref="fortipam-191-secret-onboarding-projection")
+    authorizer._grants.add(("fortipam-700-target-bound-web-projection", "projection_source"))
+    engine = M2PlanningEngine(
+        _promoted_registry(), Issuer(), authorizer,
+        projection_contract_resolver=lambda scheme, cls: secret_onboarding_projection_contract(cls),
+    )
+    requester = _requester()
+    summary = engine.compile_summary(
+        draft, requester, _target_bound_web_projections(engine, draft, exists=exists), now_epoch=NOW,
+    )
+    assert all(change.change_kind is ChangeKind.NO_OP for change in summary.object_changes
+               if change.object_class is not ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA)
+    change = next(change for change in summary.object_changes
+                  if change.object_class is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA)
+    assert change.change_kind is (ChangeKind.NO_OP if exists else ChangeKind.CREATE)
+    assert dict(change.expected_fields) == {
+        "exists": True, "inherit_permission": True, "session_recording": True,
+        "http_service_enabled": True, "proxy_mode_enabled": True,
+        "target_association_matches": True,
+    }
+    confirmation = engine.confirm_intent(
+        summary.summary_ref, requester, _interaction(summary, requester), now_epoch=NOW + 1,
+    )
+    if exists:
+        with pytest.raises(PlanningDenied, match="no-op"):
+            engine.prepare_plan(
+                summary.summary_ref, confirmation.confirmation_ref, requester, now_epoch=NOW + 2,
+            )
+        return
+    plan = engine.prepare_plan(
+        summary.summary_ref, confirmation.confirmation_ref, requester, now_epoch=NOW + 2,
+    )
+    assert len(plan.lines) == 1
+    assert plan.lines[0].target_class is ObjectClass.TARGET_BOUND_WEB_SECRET_METADATA
+
+
+@pytest.mark.parametrize("mode", [
+    "wrong_blueprint", "targetless_secret", "missing_target", "extra_target",
+    "disable_proxy", "disable_http", "disable_recording", "unverified_association",
+    "unverified_target", "revoke_secret", "missing_folder", "missing_template",
+    "target_drift", "existing_secret_drift",
+])
+def test_target_bound_web_rejects_expanded_or_unverified_intent(mode):
+    draft = _target_bound_web_draft()
+    objects = list(draft.desired_objects)
+    if mode == "wrong_blueprint":
+        draft = replace(draft, blueprint_ref="FPA-BP-005", outcome_code="onboard_privileged_resource")
+    elif mode == "targetless_secret":
+        objects[-1] = _web_account_draft().desired_objects[-1]
+    elif mode == "missing_target":
+        objects.pop(2)
+    elif mode == "extra_target":
+        objects.append(_secret_draft().desired_objects[1])
+    elif mode == "revoke_secret":
+        objects[-1] = replace(objects[-1], desired_exists=False, desired_fields=())
+    elif mode in {"disable_proxy", "disable_http", "disable_recording", "unverified_association"}:
+        field = {
+            "disable_proxy": "proxy_mode_enabled", "disable_http": "http_service_enabled",
+            "disable_recording": "session_recording", "unverified_association": "target_association_matches",
+        }[mode]
+        objects[-1] = replace(objects[-1], desired_fields=tuple(sorted({
+            **dict(objects[-1].desired_fields), field: False,
+        }.items())))
+    elif mode == "unverified_target":
+        objects[2] = replace(objects[2], desired_fields=(
+            ("profile_ref", "web-target-profile-ref01"), ("target_relation_matches", False),
+        ))
+    draft = replace(draft, desired_objects=tuple(objects))
+    engine = _engine(draft)
+    current = _target_bound_web_projections(engine, draft)
+    if mode in {"missing_folder", "missing_template", "target_drift", "existing_secret_drift"}:
+        index = {"missing_folder": 0, "missing_template": 1,
+                 "target_drift": 2, "existing_secret_drift": 3}[mode]
+        fields = {"exists": False} if mode.startswith("missing") else {
+            "exists": True, **dict(objects[index].desired_fields),
+            ("target_relation_matches" if index == 2 else "proxy_mode_enabled"): False,
+        }
+        current[index] = _projection(engine, draft.scheme_id, objects[index], fields)
+    with pytest.raises(PlanningDenied):
+        engine.compile_summary(draft, _requester(), current, now_epoch=NOW)

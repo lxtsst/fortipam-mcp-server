@@ -11,6 +11,7 @@ from jsonschema.exceptions import ValidationError
 
 from fortipam_mcp.action_packages import (
     ActionPackageValidationError,
+    REGISTRY_PATH,
     get_action_package,
     load_action_packages,
     validate_action_packages,
@@ -19,6 +20,7 @@ from fortipam_mcp.action_packages import (
 
 PROJECT_ROOT = Path(__file__).parents[1]
 SCHEMA_PATH = PROJECT_ROOT / "schemas" / "v3_action_package.schema.json"
+SOURCE_REGISTRY_PATH = PROJECT_ROOT / "registry" / "v3_action_packages.json"
 
 
 def _schema_validator() -> Draft202012Validator:
@@ -36,9 +38,46 @@ def test_packaged_folder_create_candidate_is_valid_and_inert() -> None:
     assert package["version"] == "3.2.0"
     assert package["evidence_status"] == "evidence_pending"
     assert package["status"] == "disabled_by_policy"
-    assert package["method"] == "unknown"
-    assert package["path"] == "unknown"
-    assert package["body"] == "unknown"
+    assert package["contract_status"] == "documented"
+    assert package["method"] == "POST"
+    assert package["path"] == "/api/v2/cmdb/secret/folder"
+    assert package["scope"] == "child_only"
+    assert package["body"] == "folder-create-request-v2"
+    assert package["request_schema"]["fields"] == [
+        "id",
+        "name",
+        "inherit-policy",
+        "inherit-permission",
+        "inherit-folder-ztna",
+        "parent-folder",
+        "user-permission",
+        "group-permission",
+    ]
+    assert package["request_schema"]["bounded_inputs"] == {
+        "name": {
+            "type": "string",
+            "min_length": 1,
+            "max_length": 64,
+            "path_separators_allowed": False,
+            "control_characters_allowed": False,
+        },
+        "parent-folder": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2_147_483_647,
+        },
+    }
+    assert package["permission_contract"] == {
+        "status": "source_documented_lab_identity_pending",
+        "collection_read": "SecretFolder Read",
+        "detail_read": "SecretFolder Read",
+        "child_create": "SecretFolder Read/Write",
+        "root_folder_required": False,
+        "current_lab_evidence": "v3_api_identity_folder_collection_read_http_403",
+        "execution_identity_status": "dedicated_v4_least_privilege_identity_pending",
+        "provider_access_group": "secretgrp",
+    }
+    assert any("Root creation is explicitly out of scope" in gap for gap in package["evidence_gaps"])
     assert package["adapter"] == "none"
     assert package["executable"] is False
     assert package["dispatchable"] is False
@@ -47,14 +86,25 @@ def test_packaged_folder_create_candidate_is_valid_and_inert() -> None:
     assert package["device_access"] is False
 
 
+def test_packaged_registry_matches_the_authoritative_source_registry() -> None:
+    packaged = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+    source = json.loads(SOURCE_REGISTRY_PATH.read_text(encoding="utf-8"))
+    assert packaged == source
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
         lambda registry: registry.update({"unexpected": True}),
         lambda registry: registry["packages"][0].update({"unexpected": True}),
-        lambda registry: registry["packages"][0].update({"method": "POST"}),
         lambda registry: registry["packages"][0].update({"path": "/api/v2/unknown"}),
         lambda registry: registry["packages"][0].update({"body": {"name": "x"}}),
+        lambda registry: registry["packages"][0].update({"source_refs": ["unreviewed-note"]}),
+        lambda registry: registry["packages"][0]["request_schema"].update({"unknown": True}),
+        lambda registry: registry["packages"][0].update({"scope": "root_and_child"}),
+        lambda registry: registry["packages"][0]["request_schema"].update(
+            {"bounded_inputs": {"parent-folder": {"minimum": 0}}}
+        ),
         lambda registry: registry["packages"][0].update({"adapter": "fortipam-rest"}),
         lambda registry: registry["packages"][0].update({"executable": True}),
         lambda registry: registry["packages"][0].update({"dispatchable": True}),
@@ -82,6 +132,7 @@ def test_schema_and_validator_reject_unsafe_or_unknown_changes(
         lambda registry: registry["packages"][0].update({"maturity": "implemented"}),
         lambda registry: registry["packages"][0].update({"evidence_refs": ["unreviewed-note"]}),
         lambda registry: registry["packages"][0].update({"evidence_gaps": []}),
+        lambda registry: registry["packages"][0].update({"contract_status": "verified"}),
         lambda registry: registry["packages"][0].pop("required_gates"),
     ],
 )

@@ -17,7 +17,7 @@ jobs:
   deterministic-release:
     name: deterministic-release (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -40,10 +40,13 @@ jobs:
           python -m pip install
           --constraint deploy/docker/runtime-constraints.txt
           hatchling==1.32.0
-          --editable '.[dev]'
+          --editable '.[dev,bulk-import]'
 
       - name: Check repository hygiene
         run: python scripts/check_repository_hygiene.py
 
       - name: Verify deterministic release
+        env:
+          PYTEST_ADDOPTS: "-n 4 --dist loadfile -ra"
+          PYTHONHASHSEED: "0"
         run: python scripts/verify_release.py

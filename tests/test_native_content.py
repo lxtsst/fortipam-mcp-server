@@ -154,16 +154,18 @@ def test_mcp_registers_native_resources_and_prompts_without_changing_tools() -> 
     assert "get_password_changer_configuration_posture_summary" in content
 
 
-def test_mcp_prompt_rejects_undeclared_or_invalid_arguments() -> None:
+def test_mcp_prompt_rejects_undeclared_or_invalid_arguments(caplog: pytest.LogCaptureFixture) -> None:
     server = FortiPamMcpServer()
 
     async def _reject() -> None:
         async with Client(server.mcp) as client:
-            with pytest.raises(MCPError):
+            with pytest.raises(MCPError) as undeclared:
                 await client.get_prompt(
                     "fortipam_ha_diagnostics_triage",
                     arguments={"detail_level": "incident", "command": "not-accepted"},
                 )
+            assert "not-accepted" not in str(undeclared.value)
+            assert "input_value" not in str(undeclared.value)
             with pytest.raises(MCPError):
                 await client.get_prompt(
                     "fortipam_ha_diagnostics_triage",
@@ -171,3 +173,5 @@ def test_mcp_prompt_rejects_undeclared_or_invalid_arguments() -> None:
                 )
 
     asyncio.run(_reject())
+    assert "not-accepted" not in caplog.text
+    assert "input_value" not in caplog.text

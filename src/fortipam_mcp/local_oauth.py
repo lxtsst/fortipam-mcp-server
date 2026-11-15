@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import getpass
 from hashlib import scrypt, sha256
 from html import escape
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -34,7 +35,12 @@ from mcp.server.auth.provider import (
     TokenError,
     construct_redirect_uri,
 )
+from mcp.server.auth.handlers.authorize import AuthorizationHandler
 from mcp.server.auth.handlers.metadata import MetadataHandler
+from mcp.server.auth.handlers.register import RegistrationHandler
+from mcp.server.auth.handlers.revoke import RevocationHandler
+from mcp.server.auth.handlers.token import TokenHandler
+from mcp.server.auth.middleware.client_auth import ClientAuthenticator
 from mcp.server.auth.routes import build_metadata, cors_middleware, create_auth_routes
 from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
@@ -46,7 +52,13 @@ from starlette.routing import Route
 LOCAL_SCOPE = "fortipam:read"
 LOCAL_DIAGNOSTIC_SCOPE = "fortipam:diagnostic"
 LOCAL_OPERATION_SCOPE = "fortipam:operate"
-LOCAL_SCOPES = (LOCAL_SCOPE, LOCAL_DIAGNOSTIC_SCOPE, LOCAL_OPERATION_SCOPE)
+LOCAL_PLANNING_SCOPE = "fortipam:plan"
+LOCAL_SCOPES = (
+    LOCAL_SCOPE,
+    LOCAL_DIAGNOSTIC_SCOPE,
+    LOCAL_OPERATION_SCOPE,
+    LOCAL_PLANNING_SCOPE,
+)
 LOCAL_DEFAULT_SCOPES = (LOCAL_SCOPE, LOCAL_DIAGNOSTIC_SCOPE)
 PASSWORD_SCHEME = "scrypt-v1"
 PASSWORD_N = 2**15
@@ -78,6 +90,7 @@ class LocalOAuthSettings:
     database_path: Path
     username: str
     password_hash: str
+    insecure_private_ip_lab: bool = False
     scope: str = LOCAL_SCOPE
     available_scopes: tuple[str, ...] = LOCAL_SCOPES
     default_scopes: tuple[str, ...] = LOCAL_DEFAULT_SCOPES
@@ -236,6 +249,7 @@ class LocalOAuthProvider:
         """Consume one code and issue an access/refresh token family."""
 
         now = int(time.time())
+        lifetime = self._access_token_lifetime()
         family_id = secrets.token_hex(16)
         access_token = _random_token()
         refresh_token = _random_token()
@@ -265,7 +279,7 @@ class LocalOAuthProvider:
                 "access",
                 client.client_id,
                 authorization_code.scopes,
-                now + ACCESS_TOKEN_LIFETIME,
+                now + lifetime,
                 authorization_code.resource or self.settings.resource,
                 authorization_code.subject or self.settings.username,
                 family_id,
@@ -286,7 +300,7 @@ class LocalOAuthProvider:
         return OAuthToken(
             access_token=access_token,
             token_type="Bearer",
-            expires_in=ACCESS_TOKEN_LIFETIME,
+            expires_in=lifetime,
             scope=" ".join(authorization_code.scopes),
             refresh_token=refresh_token if issue_refresh else None,
         )
@@ -394,7 +408,12 @@ class LocalOAuthProvider:
             expires_at=row["expires_at"],
             resource=row["resource"],
             subject=row["subject"],
-            claims={"iss": self.settings.issuer},
+            # Canonical identity comes from the verified server-side token row.
+            claims={
+                "iss": self.settings.issuer,
+                "sub": row["subject"],
+                "client_id": row["client_id"],
+            },
         )
 
     async def revoke_token(self, token: AccessToken | RefreshToken) -> None:
@@ -442,23 +461,40 @@ class LocalOAuthProvider:
             password,
         )
 
-    def authorization_routes(self) -> list[Route]:
-        """Return path-prefixed SDK OAuth routes plus the local login route."""
+    def _access_token_lifetime(self) -> int:
+        return ACCESS_TOKEN_LIFETIME
 
-        issuer = AnyHttpUrl(self.settings.issuer)
-        registration_options = ClientRegistrationOptions(
+    def _registration_options(self) -> ClientRegistrationOptions:
+        return ClientRegistrationOptions(
             enabled=True,
             client_secret_expiry_seconds=30 * 24 * 3600,
             valid_scopes=list(self.settings.available_scopes),
             default_scopes=list(self.settings.default_scopes),
         )
+
+    def _permission_description(self, scopes: object) -> str:
+        return _scope_description(scopes)
+
+    def authorization_routes(self) -> list[Route]:
+        """Return path-prefixed SDK OAuth routes plus the local login route."""
+
+        issuer = AnyHttpUrl(self.settings.issuer)
+        registration_options = self._registration_options()
         revocation_options = RevocationOptions(enabled=True)
-        routes = create_auth_routes(
-            provider=self,
-            issuer_url=issuer,
-            client_registration_options=registration_options,
-            revocation_options=revocation_options,
-        )
+        if self.settings.insecure_private_ip_lab:
+            routes = _private_ip_lab_auth_routes(
+                self,
+                issuer,
+                registration_options,
+                revocation_options,
+            )
+        else:
+            routes = create_auth_routes(
+                provider=self,
+                issuer_url=issuer,
+                client_registration_options=registration_options,
+                revocation_options=revocation_options,
+            )
         issuer_path = urlsplit(self.settings.issuer).path.rstrip("/")
         rewritten: list[Route] = []
         for route in routes:
@@ -528,7 +564,7 @@ class LocalOAuthProvider:
         body = f"""
 <h1>Authorize FortiPAM MCP</h1>
 <p>Client: <strong>{escape(client)}</strong></p>
-<p>Permission: {escape(_scope_description(json.loads(pending["scopes_json"])))}</p>
+<p>Permission: {escape(self._permission_description(json.loads(pending["scopes_json"])))}</p>
 {message}
 <form method="post" action="{escape(self.login_path)}">
   <input type="hidden" name="request_id" value="{escape(request_id)}">
@@ -549,7 +585,7 @@ class LocalOAuthProvider:
             CSRF_COOKIE,
             csrf_token,
             max_age=AUTHORIZATION_REQUEST_LIFETIME,
-            secure=True,
+            secure=not self.settings.insecure_private_ip_lab,
             httponly=True,
             samesite="lax",
             path=self.login_path,
@@ -948,7 +984,7 @@ class LocalOAuthProvider:
         response.delete_cookie(
             CSRF_COOKIE,
             path=self.login_path,
-            secure=True,
+            secure=not self.settings.insecure_private_ip_lab,
             httponly=True,
             samesite="lax",
         )
@@ -959,6 +995,7 @@ def local_oauth_settings_from_environment(
     *,
     prefix: str,
     public_url: str,
+    allow_insecure_private_ip_lab: bool = False,
 ) -> LocalOAuthSettings:
     """Load embedded OAuth settings from a prefixed environment mapping."""
 
@@ -967,8 +1004,13 @@ def local_oauth_settings_from_environment(
         issuer = f"{public_url.rstrip('/')}/oauth"
     parsed_issuer = urlsplit(issuer)
     parsed_resource = urlsplit(public_url)
+    insecure_private_ip_lab = (
+        allow_insecure_private_ip_lab
+        and _is_private_lab_http_url(public_url)
+        and _is_private_lab_http_url(issuer)
+    )
     if (
-        parsed_issuer.scheme != "https"
+        parsed_issuer.scheme != ("http" if insecure_private_ip_lab else "https")
         or parsed_issuer.netloc != parsed_resource.netloc
         or not parsed_issuer.path
         or parsed_issuer.path == "/"
@@ -980,7 +1022,8 @@ def local_oauth_settings_from_environment(
         or any(segment in {".", ".."} for segment in parsed_issuer.path.split("/"))
     ):
         raise LocalOAuthConfigurationError(
-            "The local OAuth issuer must be a path-based HTTPS URL on the MCP public host."
+            "The local OAuth issuer must be a path-based HTTPS URL on the MCP public host, "
+            "except for the explicit private-IP lab mode."
         )
     database = _environment_value(environment, prefix, "LOCAL_OAUTH_DB")
     username = _environment_value(environment, prefix, "LOCAL_OAUTH_USERNAME")
@@ -1012,7 +1055,80 @@ def local_oauth_settings_from_environment(
         database_path=Path(database).expanduser(),
         username=username,
         password_hash=password_hash,
+        insecure_private_ip_lab=insecure_private_ip_lab,
     )
+
+
+def _is_private_lab_http_url(raw: str) -> bool:
+    parsed = urlsplit(raw)
+    if (
+        parsed.scheme != "http"
+        or not parsed.hostname
+        or parsed.port is not None
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
+        return False
+    try:
+        address = ipaddress.ip_address(parsed.hostname)
+    except ValueError:
+        return False
+    return address.version == 4 and address in ipaddress.ip_network((0x0A000000, 8))
+
+
+def _private_ip_lab_auth_routes(
+    provider: LocalOAuthProvider,
+    issuer: AnyHttpUrl,
+    registration_options: ClientRegistrationOptions,
+    revocation_options: RevocationOptions,
+) -> list[Route]:
+    """Build the SDK route set for the explicit private-IP HTTP lab exception."""
+
+    metadata = build_metadata(
+        issuer,
+        None,
+        registration_options,
+        revocation_options,
+    )
+    client_authenticator = ClientAuthenticator(provider)
+    return [
+        Route(
+            "/.well-known/oauth-authorization-server",
+            endpoint=cors_middleware(MetadataHandler(metadata).handle, ["GET", "OPTIONS"]),
+            methods=["GET", "OPTIONS"],
+        ),
+        Route(
+            "/authorize",
+            endpoint=AuthorizationHandler(provider).handle,
+            methods=["GET", "POST"],
+        ),
+        Route(
+            "/token",
+            endpoint=cors_middleware(
+                TokenHandler(provider, client_authenticator).handle,
+                ["POST", "OPTIONS"],
+            ),
+            methods=["POST", "OPTIONS"],
+        ),
+        Route(
+            "/register",
+            endpoint=cors_middleware(
+                RegistrationHandler(provider, registration_options).handle,
+                ["POST", "OPTIONS"],
+            ),
+            methods=["POST", "OPTIONS"],
+        ),
+        Route(
+            "/revoke",
+            endpoint=cors_middleware(
+                RevocationHandler(provider, client_authenticator).handle,
+                ["POST", "OPTIONS"],
+            ),
+            methods=["POST", "OPTIONS"],
+        ),
+    ]
 
 
 def hash_local_password(password: str, *, salt: bytes | None = None) -> str:
@@ -1070,7 +1186,12 @@ def _scope_description(scopes: object) -> str:
     if LOCAL_DIAGNOSTIC_SCOPE in scopes:
         labels.append("fixed local diagnostic state")
     if LOCAL_OPERATION_SCOPE in scopes:
-        labels.append("controlled-operation authorization (no device action is enabled)")
+        labels.append(
+            "controlled operations, including explicitly enabled and separately "
+            "confirmed device actions"
+        )
+    if LOCAL_PLANNING_SCOPE in scopes:
+        labels.append("V4 non-executing administrative planning")
     return "; ".join(labels)
 
 

@@ -19,6 +19,8 @@ NATIVE_CONTENT_SCHEMA_VERSION = "2.1"
 NATIVE_RESOURCE_PREFIX = "fortipam://v2.1"
 DIAGNOSTIC_CONTENT_SCHEMA_VERSION = "2.3"
 DIAGNOSTIC_RESOURCE_PREFIX = "fortipam://v2.3"
+V4_CONTENT_SCHEMA_VERSION = "4.0-beta.7"
+V4_RESOURCE_PREFIX = "fortipam://v4"
 PROMPT_DETAIL_LEVELS = frozenset({"standard", "incident"})
 
 
@@ -265,6 +267,34 @@ class FortiPamNativeContent:
             schema_version=DIAGNOSTIC_CONTENT_SCHEMA_VERSION,
         )
 
+    def v4_plan_contracts_resource(self) -> str:
+        """Return the isolated V4 plan-only exposure and denial boundaries."""
+
+        return _resource_envelope(
+            "v4_plan_contracts",
+            {
+                "runtime_profile": "v4-plan-only",
+                "http_oauth_scope": "fortipam:plan",
+                "stdio_supported": False,
+                "static_bearer_supported": False,
+                "tool_names": [
+                    "preview_v4_administrative_intent",
+                    "confirm_v4_administrative_intent",
+                    "prepare_v4_non_executable_plan",
+                    "get_v4_plan_status",
+                ],
+                "scheme_draft_input": "server_issued_opaque_reference",
+                "model_text_is_confirmation": False,
+                "host_services_required_for_transitions": True,
+                "status_available_without_host_services": True,
+                "device_access": False,
+                "product_write_enabled": False,
+                "executor_packaged": False,
+                "product_adapter_packaged": False,
+            },
+            schema_version=V4_CONTENT_SCHEMA_VERSION,
+        )
+
 
 def render_workflow_prompt(name: str, detail_level: object = "standard") -> str:
     """Render one fixed workflow after strict enum-only argument validation."""
@@ -340,6 +370,48 @@ def register_native_content(mcp_server: Any, native_content: FortiPamNativeConte
 
     for workflow in _WORKFLOW_PROMPTS:
         _register_prompt(mcp_server, workflow)
+
+
+def register_v4_plan_content(
+    mcp_server: Any,
+    native_content: FortiPamNativeContent,
+) -> None:
+    """Register V4-only planning metadata without expanding device authority."""
+
+    uri = f"{V4_RESOURCE_PREFIX}/plan-contracts"
+    mcp_server.resource(
+        uri,
+        name="plan-contracts",
+        title="FortiPAM V4 plan-only contracts",
+        description=(
+            "OAuth scope, host-service, confirmation, and non-execution boundaries "
+            "for the isolated V4 planning surface."
+        ),
+        mime_type="application/json",
+    )(native_content.v4_plan_contracts_resource)
+
+    @mcp_server.prompt(
+        name="fortipam_v4_plan_only_workflow",
+        title="FortiPAM V4 plan-only workflow",
+        description=(
+            "Guide a status, preview, trusted-human confirmation, and "
+            "non-executable plan sequence without product mutation."
+        ),
+    )
+    def render() -> str:
+        return (
+            "FortiPAM V4 plan-only workflow:\n"
+            "1. Call get_v4_plan_status and stop if required host services are unbound.\n"
+            "2. Use only a server-issued scheme_draft_ref with "
+            "preview_v4_administrative_intent.\n"
+            "3. Present the exact Current/Proposed/Expected summary to the human. "
+            "Model text is not confirmation.\n"
+            "4. A trusted host confirmation service may invoke "
+            "confirm_v4_administrative_intent for the exact summary revision.\n"
+            "5. prepare_v4_non_executable_plan may produce only a non-dispatchable plan.\n"
+            "No Tool in this workflow contacts or changes FortiPAM, retrieves material, "
+            "or exposes execute, apply, rollback, REST, SSH, shell, or CLI authority."
+        )
 
 
 def _register_prompt(mcp_server: Any, workflow: WorkflowPrompt) -> None:

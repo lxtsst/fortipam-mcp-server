@@ -45,7 +45,13 @@ MATURITY_ORDER = (
 )
 MATURITY = set(MATURITY_ORDER)
 LIFECYCLE = set(MATURITY_ORDER)
-M2_SCHEMES = {"AccessDomainScheme", "SecretOnboardingScheme"}
+M2_SCHEMES = {
+    "BulkOnboardingScheme",
+    "AccessDomainScheme",
+    "ApprovalAndObserveScheme",
+    "IdentityLifecycleScheme",
+    "SecretOnboardingScheme",
+}
 INTENT_BINDINGS = {
     "authenticated_requester",
     "summary_digest",
@@ -113,20 +119,139 @@ MATRIX_ROW_RE = re.compile(
 )
 IMPLEMENTATION_EVIDENCE_KEYS = {
     "evidence_status", "evidence_kind", "profile_blueprint_refs", "module_refs", "test_refs", "dispatchable",
-    "runtime_packaged", "mcp_exposed", "device_access",
+    "planner_runtime_packaged", "planner_mcp_exposed", "executor_runtime_packaged",
+    "executor_mcp_exposed", "device_access", "projection_profile",
 }
+IMPLEMENTATION_EVIDENCE_REQUIRED_KEYS = (
+    IMPLEMENTATION_EVIDENCE_KEYS - {"projection_profile"}
+)
 IMPLEMENTATION_EVIDENCE_STATUSES = {"pending_contract_tests", "contract_tested"}
 M2_MODULE_REFS = [
     "scripts/v4_planning.py",
+    "scripts/build_v4_plan_runtime.py",
     "v4_planning/canonical.py",
     "v4_planning/models.py",
     "v4_planning/engine.py",
+    "v4_planning/store.py",
+    "v4_planning/persistence.py",
+    "v4_planning/workflow_service.py",
+    "v4_planning/mcp_facade.py",
+    "v4_planning/runtime_profile.py",
     "v4_planning/__init__.py",
 ]
-M2_TEST_REFS = ["tests/test_v4_planning.py"]
+M2_TEST_REFS = [
+    "tests/test_v4_planning.py",
+    "tests/test_v4_m3.py",
+    "tests/test_v4_persistence.py",
+    "tests/test_v4_plan_runtime.py",
+]
+ACCESS_DOMAIN_SOURCE_MODULE_REFS = [
+    *M2_MODULE_REFS,
+    "src/fortipam_mcp/access_domain_projection_source.py",
+    "src/fortipam_mcp/v4_runtime_host.py",
+]
+ACCESS_DOMAIN_SOURCE_TEST_REFS = [
+    *M2_TEST_REFS,
+    "tests/test_access_domain_projection_source.py",
+    "tests/test_v4_runtime_host.py",
+]
+ACCESS_DOMAIN_PROJECTION_PROFILE = {
+    "contract_id": "fortipam-access-domain-folder-observation-v1",
+    "contract_version": "1.1.0",
+    "source_ref": "fortipam-191-access-domain-projection",
+    "object_classes": ["PublicFolder", "AccessGrant"],
+    "max_age_seconds": 300,
+    "read_only": True,
+    "raw_responses_returned": False,
+    "product_selectors_returned": False,
+}
+SECRET_ONBOARDING_SOURCE_MODULE_REFS = [
+    *M2_MODULE_REFS,
+    "src/fortipam_mcp/secret_onboarding_projection_source.py",
+    "src/fortipam_mcp/v4_runtime_host.py",
+]
+SECRET_ONBOARDING_SOURCE_TEST_REFS = [
+    *M2_TEST_REFS,
+    "tests/test_secret_onboarding_projection_source.py",
+    "tests/test_v4_runtime_host.py",
+]
+SECRET_ONBOARDING_PROJECTION_PROFILE = {
+    "contract_id": "fortipam-secret-onboarding-observation-v1",
+    "contract_version": "1.7.0",
+    "source_ref": "fortipam-191-secret-onboarding-projection",
+    "object_classes": [
+        "FolderBinding",
+        "Target",
+        "TemplateBinding",
+        "SecretMetadata",
+        "WebSecretMetadata",
+        "LauncherBinding",
+        "PolicyBinding",
+        "RdpEventFilterBinding",
+    ],
+    "additional_contracts": [{
+        "contract_id": "fortipam-secret-session-controls-observation-v1",
+        "contract_version": "1.1.0",
+        "source_ref": "fortipam-191-secret-session-controls-projection",
+        "object_classes": ["SecretSessionControlsBinding"],
+    }, {
+        "contract_id": "fortipam-web-secret-service-observation-v1",
+        "contract_version": "1.0.0",
+        "source_ref": "fortipam-191-secret-onboarding-projection",
+        "object_classes": ["WebSecretServiceBinding"],
+    }],
+    "max_age_seconds": 300,
+    "read_only": True,
+    "raw_responses_returned": False,
+    "product_selectors_returned": False,
+}
+APPROVAL_AND_OBSERVE_SOURCE_MODULE_REFS = [
+    *M2_MODULE_REFS,
+    "src/fortipam_mcp/approval_and_observe_projection_source.py",
+    "src/fortipam_mcp/v4_runtime_host.py",
+]
+APPROVAL_AND_OBSERVE_SOURCE_TEST_REFS = [
+    *M2_TEST_REFS,
+    "tests/test_approval_and_observe_projection_source.py",
+    "tests/test_v4_runtime_host.py",
+]
+APPROVAL_AND_OBSERVE_PROJECTION_PROFILE = {
+    "contract_id": "approval-and-observe-state-v1",
+    "contract_version": "1.0.0",
+    "source_ref": "fortipam-191-approval-observe-projection",
+    "object_classes": ["ApprovalProfileBinding", "SecretApprovalBinding"],
+    "max_age_seconds": 300,
+    "read_only": True,
+    "raw_responses_returned": False,
+    "product_selectors_returned": False,
+}
+AD_DISCOVERY_SOURCE_MODULE_REFS = [
+    *M2_MODULE_REFS, "src/fortipam_mcp/ad_discovery_projection_source.py",
+]
+AD_DISCOVERY_SOURCE_TEST_REFS = [
+    *M2_TEST_REFS, "tests/test_ad_discovery_projection_source.py",
+]
+AD_DISCOVERY_PROJECTION_PROFILE = {
+    "contract_id": "fortipam-ad-discovery-source-observation-v1",
+    "contract_version": "1.0.0",
+    "source_ref": "fortipam-700-build29-ad-discovery-projection",
+    "object_classes": ["FolderBinding", "DomainTargetBinding", "TemplateBinding",
+                       "DomainSecretMetadata", "DiscoverySourceMetadata"],
+    "max_age_seconds": 300, "read_only": True,
+    "raw_responses_returned": False, "product_selectors_returned": False,
+}
+SOURCE_BACKED_PROJECTION_PROFILES = {
+    "BulkOnboardingScheme": AD_DISCOVERY_PROJECTION_PROFILE,
+    "AccessDomainScheme": ACCESS_DOMAIN_PROJECTION_PROFILE,
+    "ApprovalAndObserveScheme": APPROVAL_AND_OBSERVE_PROJECTION_PROFILE,
+    "SecretOnboardingScheme": SECRET_ONBOARDING_PROJECTION_PROFILE,
+}
 M2_PROFILE_BLUEPRINT_REFS = {
+    "BulkOnboardingScheme": ["FPA-BP-014"],
     "AccessDomainScheme": ["FPA-BP-004"],
-    "SecretOnboardingScheme": ["FPA-BP-005"],
+    "ApprovalAndObserveScheme": ["FPA-BP-008"],
+    "IdentityLifecycleScheme": ["FPA-BP-015"],
+    "SecretOnboardingScheme": ["FPA-BP-005", "FPA-BP-006", "FPA-BP-007"],
 }
 FORBIDDEN_MATERIAL_KEYS = {
     "password",
@@ -568,7 +693,7 @@ def _require_source_containment(
 
 
 def _check_implementation_evidence(scheme: Mapping[str, Any], errors: list[str]) -> None:
-    """Validate the narrow fake-only M2 promotion gate for two Schemes."""
+    """Validate the narrow M2 implementation-evidence profile."""
 
     scheme_id = scheme.get("id")
     evidence = scheme.get("implementation_evidence")
@@ -577,27 +702,75 @@ def _check_implementation_evidence(scheme: Mapping[str, Any], errors: list[str])
             errors.append(f"scheme {scheme_id} cannot carry M2 implementation evidence")
         return
     if not isinstance(evidence, dict):
-        errors.append(f"scheme {scheme_id} needs fake-only implementation evidence")
+        errors.append(f"scheme {scheme_id} needs implementation evidence")
         return
     _check_unknown_keys(evidence, IMPLEMENTATION_EVIDENCE_KEYS, f"scheme {scheme_id} implementation evidence", errors)
-    _check_required_keys(evidence, IMPLEMENTATION_EVIDENCE_KEYS, f"scheme {scheme_id} implementation evidence", errors)
+    _check_required_keys(
+        evidence,
+        IMPLEMENTATION_EVIDENCE_REQUIRED_KEYS,
+        f"scheme {scheme_id} implementation evidence",
+        errors,
+    )
     if evidence.get("evidence_status") not in IMPLEMENTATION_EVIDENCE_STATUSES:
         errors.append(f"scheme {scheme_id} has invalid implementation evidence status")
-    if evidence.get("evidence_kind") != "fake_only_contract":
-        errors.append(f"scheme {scheme_id} evidence must be fake_only_contract")
+    expected_kind = (
+        "source_backed_projection_contract"
+        if scheme_id in SOURCE_BACKED_PROJECTION_PROFILES
+        else "fake_only_contract"
+    )
+    if evidence.get("evidence_kind") != expected_kind:
+        errors.append(f"scheme {scheme_id} evidence kind is invalid")
     if evidence.get("profile_blueprint_refs") != M2_PROFILE_BLUEPRINT_REFS[scheme_id]:
         errors.append(f"scheme {scheme_id} evidence has an unsupported M2 profile Blueprint")
+    expected_modules = {
+        "BulkOnboardingScheme": AD_DISCOVERY_SOURCE_MODULE_REFS,
+        "AccessDomainScheme": ACCESS_DOMAIN_SOURCE_MODULE_REFS,
+        "ApprovalAndObserveScheme": APPROVAL_AND_OBSERVE_SOURCE_MODULE_REFS,
+        "SecretOnboardingScheme": SECRET_ONBOARDING_SOURCE_MODULE_REFS,
+    }.get(scheme_id, M2_MODULE_REFS)
+    expected_tests = {
+        "BulkOnboardingScheme": AD_DISCOVERY_SOURCE_TEST_REFS,
+        "AccessDomainScheme": ACCESS_DOMAIN_SOURCE_TEST_REFS,
+        "ApprovalAndObserveScheme": APPROVAL_AND_OBSERVE_SOURCE_TEST_REFS,
+        "SecretOnboardingScheme": SECRET_ONBOARDING_SOURCE_TEST_REFS,
+    }.get(scheme_id, M2_TEST_REFS)
     evidence_refs_are_exact = (
-        evidence.get("module_refs") == M2_MODULE_REFS
-        and evidence.get("test_refs") == M2_TEST_REFS
+        evidence.get("module_refs") == expected_modules
+        and evidence.get("test_refs") == expected_tests
     )
     if not evidence_refs_are_exact:
         errors.append(f"scheme {scheme_id} implementation evidence refs are not the restricted relative paths")
-    elif any(not (PROJECT_ROOT / reference).is_file() for reference in (*M2_MODULE_REFS, *M2_TEST_REFS)):
+    elif any(
+        not (PROJECT_ROOT / reference).is_file()
+        for reference in (*expected_modules, *expected_tests)
+    ):
         errors.append(f"scheme {scheme_id} implementation evidence file is unavailable")
-    for field in ("dispatchable", "runtime_packaged", "mcp_exposed", "device_access"):
+    for field in (
+        "dispatchable",
+        "executor_runtime_packaged",
+        "executor_mcp_exposed",
+    ):
         if evidence.get(field) is not False:
             errors.append(f"scheme {scheme_id} evidence field {field} must be false")
+    if evidence.get("device_access") is not (
+        scheme_id in SOURCE_BACKED_PROJECTION_PROFILES
+    ):
+        errors.append(f"scheme {scheme_id} evidence field device_access is invalid")
+    projection_profile = evidence.get("projection_profile")
+    expected_projection_profile = SOURCE_BACKED_PROJECTION_PROFILES.get(scheme_id)
+    if expected_projection_profile is not None:
+        if projection_profile != expected_projection_profile:
+            errors.append(f"scheme {scheme_id} source-backed projection profile is invalid")
+    elif projection_profile is not None:
+        errors.append(f"scheme {scheme_id} cannot carry a projection profile")
+    if evidence.get("planner_runtime_packaged") is not True:
+        errors.append(
+            f"scheme {scheme_id} evidence field planner_runtime_packaged must be true"
+        )
+    if evidence.get("planner_mcp_exposed") is not False:
+        errors.append(
+            f"scheme {scheme_id} evidence field planner_mcp_exposed must be false"
+        )
     promoted = scheme.get("status") == "planned" or scheme.get("maturity") == "contract_tested" or scheme.get("lifecycle") == "contract_tested"
     if promoted and evidence.get("evidence_status") != "contract_tested":
         errors.append(f"scheme {scheme_id} promotion requires contract_tested evidence")

@@ -11,24 +11,93 @@
       "name": "FortiPAM Folder Create Contract-Readiness Candidate",
       "product": "FortiPAM",
       "object_kind": "secret/folder",
+      "scope": "child_only",
       "evidence_status": "evidence_pending",
-      "evidence_refs": [],
+      "source_refs": [
+        "FPA-SRC-TF-FPAM-FOLDER-F502400A",
+        "FPA-SRC-TF-FPAM-UTILITY-F502400A",
+        "FPA-SRC-TF-FPAM-API-SECRETFOLDER-F502400A",
+        "FPA-SRC-TF-FPAM-BODY5-F502400A",
+        "FPA-SRC-ADMIN-191",
+        "FPA-SRC-CATALOG-190",
+        "FPA-SRC-GUI-OBS-FOLDER-CREATE-READONLY"
+      ],
+      "evidence_refs": [
+        "FPA-SRC-TF-FPAM-FOLDER-F502400A",
+        "FPA-SRC-TF-FPAM-UTILITY-F502400A",
+        "FPA-SRC-TF-FPAM-API-SECRETFOLDER-F502400A",
+        "FPA-SRC-TF-FPAM-BODY5-F502400A",
+        "FPA-SRC-ADMIN-191",
+        "FPA-SRC-CATALOG-190",
+        "FPA-SRC-GUI-OBS-FOLDER-CREATE-READONLY"
+      ],
       "evidence_gaps": [
-        "Exact approved write method is unknown.",
-        "Exact approved write path is unknown; object_kind is not an API path.",
-        "Exact request body and field validation contract are unknown.",
-        "Response schema and fixed post-write readback projection are unknown.",
-        "Least-privilege permission mapping for this mutation is unknown.",
-        "Idempotency, uniqueness, concurrency, and duplicate handling are unknown.",
-        "Rollback or compensation semantics are unknown.",
-        "Owner-accepted positive, negative, drift, timeout, and readback lab evidence is missing."
+        "Root creation is explicitly out of scope because the owner permission-array wire encoding is unverified.",
+        "The current lab V3 API identity receives HTTP 403 on folder collection read; a dedicated V4 least-privilege identity is pending.",
+        "Positive authorization evidence for SecretFolder Read collection/detail and SecretFolder Read/Write child create is unvalidated.",
+        "Live 1.9.1 child request/response shape, status/error mapping, and fixed post-write readback are unvalidated.",
+        "Uniqueness, idempotency, concurrency, and duplicate handling remain unvalidated.",
+        "Delete compensation is documented only for empty folders; rollback acceptance and ambiguous-timeout reconciliation are unvalidated.",
+        "Owner-accepted isolated-lab evidence is missing."
       ],
       "lifecycle": "catalogued",
       "status": "disabled_by_policy",
       "maturity": "catalogued",
-      "method": "unknown",
-      "path": "unknown",
-      "body": "unknown",
+      "contract_status": "documented",
+      "method": "POST",
+      "path": "/api/v2/cmdb/secret/folder",
+      "body": "folder-create-request-v2",
+      "request_schema": {
+        "ref": "folder-create-request-v2",
+        "fields": ["id", "name", "inherit-policy", "inherit-permission", "inherit-folder-ztna", "parent-folder", "user-permission", "group-permission"],
+        "fixed_defaults": {
+          "id": 0,
+          "inherit-policy": "enable",
+          "inherit-permission": "enable",
+          "inherit-folder-ztna": "enable",
+          "user-permission": [],
+          "group-permission": []
+        },
+        "bounded_inputs": {
+          "name": {
+            "type": "string",
+            "min_length": 1,
+            "max_length": 64,
+            "path_separators_allowed": false,
+            "control_characters_allowed": false
+          },
+          "parent-folder": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        }
+      },
+      "read_routes": {
+        "collection": {"method": "GET", "path": "/api/v2/cmdb/secret/folder"},
+        "detail": {"method": "GET", "path": "/api/v2/cmdb/secret/folder/{id}"}
+      },
+      "rollback_contract": {
+        "method": "DELETE",
+        "path": "/api/v2/cmdb/secret/folder/{id}",
+        "status": "documented_partial",
+        "precondition": "empty_folder_only"
+      },
+      "permission_contract": {
+        "status": "source_documented_lab_identity_pending",
+        "collection_read": "SecretFolder Read",
+        "detail_read": "SecretFolder Read",
+        "child_create": "SecretFolder Read/Write",
+        "root_folder_required": false,
+        "current_lab_evidence": "v3_api_identity_folder_collection_read_http_403",
+        "execution_identity_status": "dedicated_v4_least_privilege_identity_pending",
+        "provider_access_group": "secretgrp"
+      },
+      "projection_contract": {
+        "ref": "folder-readback-projection-v1",
+        "status": "documented_partial",
+        "fields": ["exists", "id", "name", "parent-folder", "folder-type", "inherit-policy", "inherit-permission", "inherit-folder-ztna", "secret-policy", "user-permission-count", "group-permission-count"]
+      },
       "executable": false,
       "adapter": "none",
       "mcp_exposed": false,

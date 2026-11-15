@@ -30,3 +30,22 @@ def test_dockerfile_binds_installed_wheel_to_a_provenance_label() -> None:
         'org.opencontainers.image.fortipam.app-wheel-sha256="${APP_WHEEL_SHA256}"'
         in dockerfile
     )
+    assert 'ENTRYPOINT ["fortipam-mcp-http"]' in dockerfile
+
+
+def test_wheelhouse_keeps_only_the_current_application_wheel() -> None:
+    wheel_name = f"fortipam_mcp_server-{__version__}-py3-none-any.whl"
+    manifest = (
+        PROJECT_ROOT / "deploy/docker/wheelhouse-manifest.sha256"
+    ).read_text(encoding="utf-8")
+    application_wheels = [
+        line.split(maxsplit=1)[1]
+        for line in manifest.splitlines()
+        if "  fortipam_mcp_server-" in line
+    ]
+    download_script = (
+        PROJECT_ROOT / "deploy/docker/download_wheelhouse.sh"
+    ).read_text(encoding="utf-8")
+
+    assert application_wheels == [wheel_name]
+    assert "-name 'fortipam_mcp_server-*.whl' -delete" in download_script

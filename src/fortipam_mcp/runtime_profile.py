@@ -15,6 +15,8 @@ class RuntimeProfile(StrEnum):
 
     READONLY = "readonly"
     LAB_SIMULATED = "lab-simulated"
+    V4_PLAN_ONLY = "v4-plan-only"
+    V4_CONTROLLED = "v4-controlled"
 
 
 class RuntimeProfileError(ValueError):

@@ -56,3 +56,31 @@ def test_exact_classifier_does_not_interpret_instance_paths() -> None:
 
     assert catalog.find("GET", "/api/v2/cmdb/secret/approval-profile/private-name") is None
     assert catalog.find("GET", "/api/v2/cmdb/secret/approval-profile/{name}") is not None
+
+
+def test_discovery_entry_catalog_candidate_has_no_body_or_response_schema_claim() -> None:
+    catalog = RuntimeCatalog.load()
+    create = catalog.find("POST", "/api/v2/cmdb/secret/discovery")
+    detail = catalog.find("GET", "/api/v2/cmdb/secret/discovery/{name}")
+
+    assert create is not None
+    assert create.risk_tier == "high"
+    assert create.mcp_eligibility == "documented_not_exposed"
+    body_parameters = [
+        parameter for parameter in create.parameters if parameter.location == "body"
+    ]
+    assert len(body_parameters) == 1
+    assert body_parameters[0].required is True
+    assert body_parameters[0].schema_reference is None
+
+    assert detail is not None
+    assert detail.risk_tier == "high"
+    assert detail.mcp_eligibility == "documented_not_exposed"
+    assert any(
+        parameter.name == "name"
+        and parameter.location == "path"
+        and parameter.required is True
+        for parameter in detail.parameters
+    )
+    assert create.details()["live_call_permitted"] is False
+    assert detail.details()["live_call_permitted"] is False

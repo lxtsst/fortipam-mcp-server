@@ -2,7 +2,7 @@
   "mcpServers": {
     "fortipam-security-copilot": {
       "type": "http",
-      "url": "https://mcp.example.com/fpamcp"
+      "url": "https://mcp.example.com/fpamcp-v3"
     }
   }
 }

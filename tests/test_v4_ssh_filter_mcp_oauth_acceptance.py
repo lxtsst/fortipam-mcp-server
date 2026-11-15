@@ -1,0 +1,7 @@
+from __future__ import annotations
+import pytest
+from scripts.v4_ssh_filter_mcp_oauth_acceptance import SshFilterMcpOAuthAcceptanceError,_ve,_vp
+def test_only_unattached_deny_rm_create_contract_is_accepted()->None:
+ n="mcp-v4-ssh-filter-b100";x={"contract":"fortipam_v4_ssh_filter_create_cli_fallback_workflow_v1","preview_ref":"ssh-filter-preview-opaque","device_write_executed":False,"Current State":{"requested_profile_name":n,"profile_name_exists":False,"write_transport":"ssh_cli_fallback"},"Proposed Changes":{"operation":"create_ssh_filter_profile_via_cli_fallback","profile_name":n,"configuration_profile":"deny-rm-with-log-and-alert-v1","mode":"deny","shell_pattern":"rm","pattern_log":"enable","pattern_alert":"enable","secret_or_policy_association_changes":False,"target_or_session_changes":False,"rest_write_attempted":False},"Expected State":{"profile_name_matches":True,"profile_name_exists":True,"deny_mode_enabled":True,"rm_pattern_present":True,"pattern_log_enabled":True,"pattern_alert_enabled":True,"secret_or_policy_association_changes":False,"readback_transport":"ssh_cli"}};_vp(x,n,False)
+ r={"contract":"fortipam_v4_ssh_filter_create_cli_fallback_execution_v1","outcome":"succeeded","verification":"verified","idempotent_replay":False,"compensation":"separate_ssh_filter_profile_delete_action_required","profile_name_returned":False,"secret_or_policy_association_changes":False,"raw_cli_returned":False};_ve(r,False);r["raw_cli_returned"]=True
+ with pytest.raises(SshFilterMcpOAuthAcceptanceError):_ve(r,False)
