@@ -14,7 +14,7 @@ import time
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.verify_release import _prepare_log_directory
+from scripts.verify_release import _prepare_log_directory, deterministic_checks
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 NATIVE_TESTS = (
@@ -29,6 +29,15 @@ FAILED_TEST = re.compile(
     r"^(?:FAILED|ERROR) (tests/test_[A-Za-z0-9_]+\.py)::([A-Za-z0-9_:]+)"
 )
 COUNTS = re.compile(r"\b([0-9]+) (passed|failed|skipped|errors?|deselected)\b")
+CHECK_FAILURE = re.compile(r"Release verification check '([a-z_]+)' failed with exit code [0-9]+\.")
+CHECK_NAMES = frozenset(check.name for check in deterministic_checks(sys.executable)) | {
+    "wheel_build", "wheel_install", "installed_import", "installed_mcp_stdio",
+}
+
+
+def failure_phase(text: str) -> str | None:
+    match = CHECK_FAILURE.search(text)
+    return match[1] if match is not None and match[1] in CHECK_NAMES else None
 
 
 def pytest_summary(text: str) -> dict[str, object]:
@@ -79,7 +88,8 @@ def main() -> int:
         diagnostic = logs / "pytest.log" if args.scope == "release" else Path(output.name)
         summary = pytest_summary(tail_text(diagnostic)) if diagnostic.is_file() else {}
         print(json.dumps({"scope": args.scope, "status": "passed" if code == 0 else "failed",
-                          "exit_code": code, **summary}), flush=True)
+                          "exit_code": code, "failed_check": failure_phase(tail_text(Path(output.name))),
+                          **summary}), flush=True)
         return code if code >= 0 else 1
 
 

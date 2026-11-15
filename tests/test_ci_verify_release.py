@@ -39,3 +39,12 @@ def test_native_scope_refuses_a_non_macos_runner(tmp_path, monkeypatch) -> None:
     with pytest.raises(SystemExit) as error:
         ci_verify_release.main()
     assert error.value.code == 2
+
+
+def test_failure_phase_exposes_only_known_check_names() -> None:
+    assert ci_verify_release.failure_phase(
+        "Release verification check 'mypy' failed with exit code 1.\nSYNTHETIC_RAW_OUTPUT"
+    ) == "mypy"
+    assert ci_verify_release.failure_phase(
+        "Release verification check 'synthetic_private_value' failed with exit code 1."
+    ) is None
