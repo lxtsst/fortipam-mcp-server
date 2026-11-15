@@ -27,6 +27,10 @@ external identity/MFA, native-client behavior, and hardware-dependent scenarios
 have incomplete qualification. Unsupported or unqualified execution stays closed.
 Local tests do not certify a production deployment or grant cross-product rights.
 
+Native bulk-import worker components depend on macOS `sandbox-exec`. Their
+OS-specific isolation tests run separately on macOS; Linux CI does not qualify
+that execution path.
+
 The v3.1.3 tag preserves the previous public source. Use separate configuration,
 state, OAuth identities, and backups when evaluating V4 beside an existing V3
 deployment. Review tool schemas, permissions, and recovery contracts before

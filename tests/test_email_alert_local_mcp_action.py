@@ -127,7 +127,7 @@ def unix_services(root):
     execution=PersistentPlanningCheckpointAuthority(root/'execution-tail.db',owner_file(root/'execution-tail.key',b'z'*32),
         authority_ref='email-alert-execution-checkpoint')
     with ExitStack() as stack:
-        sockets=Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='eacp-',dir='/private/tmp')))
+        sockets=Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='eacp-',dir=Path("/tmp").resolve())))
         stack.enter_context(unix_app(create_reference_authority_sidecar_app(reference),sockets/'r.sock'))
         stack.enter_context(unix_app(create_checkpoint_sidecar_app(execution),sockets/'e.sock'))
         client=UnixReferenceAuthorityClient(UnixReferenceAuthorityClientSettings(sockets/'r.sock',REFERENCE))

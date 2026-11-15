@@ -46,7 +46,7 @@ def channel(tmp_path, monkeypatch, *, material=False, capture=None, ack_capture=
         material_store=store, ack_pins=ack_pins, clock=lambda: int(clocks[0]),
         target_owners=() if target_factory is None else (target_factory(local, session, state),))
     # macOS sockaddr_un is too short for pytest's descriptive directory names.
-    directory = Path(tempfile.mkdtemp(prefix="fp-row-", dir="/private/tmp"))
+    directory = Path(tempfile.mkdtemp(prefix="fp-row-", dir=Path("/tmp").resolve()))
     request, signer, public = directory / "request.key", directory / "signer.key", directory / "public.key"
     request_sha = write(request, b"q" * 32)
     signer_sha = write(signer, b"z" * 32)

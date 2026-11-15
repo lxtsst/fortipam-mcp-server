@@ -139,7 +139,7 @@ def scim_unix_services(tmp_path):
     material = PersistentMaterialUseCheckpointAuthority(tmp_path/'material-tail.db', owner_file(tmp_path/'material-tail.key', b'q'*32),
         authority_ref='scim-test-material-checkpoint')
     with ExitStack() as stack:
-        sockets = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='scimcp-', dir='/private/tmp')))
+        sockets = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='scimcp-', dir=Path("/tmp").resolve())))
         stack.enter_context(unix_app(create_reference_authority_sidecar_app(reference), sockets/'r.sock'))
         stack.enter_context(unix_app(create_checkpoint_sidecar_app(execution), sockets/'e.sock'))
         stack.enter_context(unix_app(create_material_checkpoint_sidecar_app(material), sockets/'m.sock'))

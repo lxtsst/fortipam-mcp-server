@@ -263,7 +263,7 @@ def authority_store(root, clock, *, ttl=60):
 
 @pytest.mark.parametrize('mode', ['normal', 'revoked', 'short'])
 def test_real_unix_reference_grants_and_checkpoints_drive_only_the_fixed_workflow(monkeypatch, tmp_path, mode):
-    with tempfile.TemporaryDirectory(prefix='emau-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='emau-', dir=Path("/tmp").resolve()) as directory:
         sockets = Path(directory); clock = Clock()
         reference = authority_store(tmp_path, clock, ttl=10 if mode == 'short' else 60)
         cas_root = tmp_path/'cas'; cas_root.mkdir(mode=0o700)

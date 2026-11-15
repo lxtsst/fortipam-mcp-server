@@ -15,13 +15,28 @@ concurrency:
 
 jobs:
   deterministic-release:
-    name: deterministic-release (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-24.04
+    name: ${{ matrix.name }} (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        include:
+          - name: deterministic-release
+            python-version: "3.11"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+          - name: deterministic-release
+            python-version: "3.12"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+          - name: native-macos
+            python-version: "3.11"
+            os: macos-15
+            scope: native-macos
+            workers: 2
 
     steps:
       - name: Check out repository
@@ -35,7 +50,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      - name: Prepare short source path for Unix sockets
+        shell: bash
+        run: |
+          ci_root=$(mktemp -d /tmp/fpa-ci.XXXXXX)
+          git clone --local --no-hardlinks "$GITHUB_WORKSPACE" "$ci_root"
+          git -C "$ci_root" checkout --detach "$GITHUB_SHA"
+          printf 'FPA_CI_ROOT=%s\n' "$ci_root" >> "$GITHUB_ENV"
+          printf 'TMPDIR=/tmp\n' >> "$GITHUB_ENV"
+
       - name: Install project and development dependencies
+        working-directory: ${{ env.FPA_CI_ROOT }}
         run: >-
           python -m pip install
           --constraint deploy/docker/runtime-constraints.txt
@@ -43,10 +68,15 @@ jobs:
           --editable '.[dev,bulk-import]'
 
       - name: Check repository hygiene
+        working-directory: ${{ env.FPA_CI_ROOT }}
         run: python scripts/check_repository_hygiene.py
 
       - name: Verify deterministic release
+        working-directory: ${{ env.FPA_CI_ROOT }}
         env:
-          PYTEST_ADDOPTS: "-n 4 --dist loadfile -ra"
+          PYTEST_ADDOPTS: "-n ${{ matrix.workers }} --dist loadfile -ra"
           PYTHONHASHSEED: "0"
-        run: python scripts/verify_release.py
+        run: >-
+          python scripts/ci_verify_release.py
+          --scope "${{ matrix.scope }}"
+          --log-directory "$RUNNER_TEMP/fortipam-release-checks"

@@ -286,7 +286,7 @@ def test_real_loopback_https_oauth_mcp_configure_send_restore(monkeypatch, tmp_p
     try:
         reference = reference_client = cas = sockets = None
         if protected_policy:
-            sockets = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='emfs-', dir='/private/tmp')))
+            sockets = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='emfs-', dir=Path("/tmp").resolve())))
             reference_root = tmp_path/'grants'; reference_root.mkdir(mode=0o700)
             reference = authority_store(reference_root, clock)
             cas_root = tmp_path/'cas'; cas_root.mkdir(mode=0o700)

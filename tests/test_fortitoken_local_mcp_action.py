@@ -128,7 +128,7 @@ def unix_services(root):
     material = PersistentMaterialUseCheckpointAuthority(root/'material-tail.db',owner_file(root/'material-tail.key',b'q'*32),
         authority_ref='ftk-material-checkpoint')
     with ExitStack() as stack:
-        sockets = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='ftkcp-',dir='/private/tmp')))
+        sockets = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix='ftkcp-',dir=Path("/tmp").resolve())))
         stack.enter_context(unix_app(create_reference_authority_sidecar_app(reference),sockets/'r.sock'))
         stack.enter_context(unix_app(create_checkpoint_sidecar_app(execution),sockets/'e.sock'))
         stack.enter_context(unix_app(create_material_checkpoint_sidecar_app(material),sockets/'m.sock'))

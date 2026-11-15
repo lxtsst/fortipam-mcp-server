@@ -107,7 +107,7 @@ def test_original_text_owner_keeps_preview_grants_and_terminal_evidence_separate
     control, intake = socket.socketpair()
     events = []
 
-    with tempfile.TemporaryDirectory(prefix='fp-text-batch-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='fp-text-batch-', dir=Path("/tmp").resolve()) as directory:
         root = Path(directory)
         request, signing, public = root / 'request.key', root / 'signing.key', root / 'public.key'
         request_digest, signing_digest = write(request, b'q' * 32), write(signing, b'z' * 32)

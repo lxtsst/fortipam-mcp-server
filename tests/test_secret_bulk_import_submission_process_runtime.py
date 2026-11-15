@@ -50,7 +50,7 @@ from test_v4_persistence import CHECKPOINT_STORE_REF, _ExternalCheckpoint, _new_
 @pytest.mark.parametrize('ending', ['close', 'control-eof', 'deadline'])
 def test_fixed_source_module_admits_original_session_then_closes_without_authority_inputs(
         monkeypatch, capfd, ending):
-    with tempfile.TemporaryDirectory(prefix='fp-src-', dir='/private/tmp') as directory, ExitStack() as stack:
+    with tempfile.TemporaryDirectory(prefix='fp-src-', dir=Path("/tmp").resolve()) as directory, ExitStack() as stack:
         root = Path(directory)
         fixture = setup(root)
         binding, _, _ = prepared(root, 'encrypted' if ending == 'close' else 'csv')

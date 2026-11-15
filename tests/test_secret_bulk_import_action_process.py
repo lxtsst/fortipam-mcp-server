@@ -68,7 +68,7 @@ client.close()
 
 @pytest.mark.skipif(sys.platform != 'darwin', reason='Native Mini lab restriction')
 def test_inherited_private_peer_works_without_new_network_authority():
-    with tempfile.TemporaryDirectory(prefix='fpa-action-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='fpa-action-', dir=Path("/tmp").resolve()) as directory:
         root = Path(directory)
         allowed = root / 'allowed-c2'; allowed.write_text('Synthetic metadata')
         allowed.chmod(0o600)
@@ -141,7 +141,7 @@ def test_native_roles_deny_other_inputs_aliases_persistence_signals_and_network(
     symbolic, hard = tmp_path / 'symbolic-alias', tmp_path / 'hard-alias'
     symbolic.symlink_to(forbidden[0]); os.link(forbidden[0], hard)
     # Short UDS pathname avoids Darwin's 104-byte address limit.
-    with tempfile.TemporaryDirectory(prefix='fpa-role-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='fpa-role-', dir=Path("/tmp").resolve()) as directory:
         row_path = Path(directory) / 'row.sock'
         row_listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         tcp_listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

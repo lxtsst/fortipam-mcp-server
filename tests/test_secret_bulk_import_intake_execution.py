@@ -113,7 +113,7 @@ def _authenticated_text_session_starts_existing_projection_and_stops_at_first_co
     monkeypatch.setattr(UnixOriginalRowChannelClient, '_post',
         lambda *_: pytest.fail('Material execution must remain isolated in this control test'))
     control, worker_peer = socket.socketpair()
-    with tempfile.TemporaryDirectory(prefix='fp-text-intake-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='fp-text-intake-', dir=Path("/tmp").resolve()) as directory:
         root = Path(directory)
         row_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         row_socket.bind(str(root / 'row.sock'))

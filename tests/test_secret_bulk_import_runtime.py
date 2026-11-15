@@ -254,7 +254,7 @@ def _configured(root, monkeypatch, stack, *, operate=False):
 @pytest.mark.parametrize('ending', ['ready', 'deadline', 'handoff'])
 def test_main_starts_before_original_intake_and_registers_only_after_independent_grants(monkeypatch, capfd, ending):
     assert boundary.build_secret_bulk_import_runtime({}, issuer=None, runtime_profile=RuntimeProfile.READONLY) is None
-    with tempfile.TemporaryDirectory(prefix='fp-run-', dir='/private/tmp') as temporary, ExitStack() as stack:
+    with tempfile.TemporaryDirectory(prefix='fp-run-', dir=Path("/tmp").resolve()) as temporary, ExitStack() as stack:
         root = Path(temporary)
         environment, settings, issuer, binding, native, defaults, capture, manifest, planner, intake = _configured(
             root, monkeypatch, stack, operate=ending == 'handoff')

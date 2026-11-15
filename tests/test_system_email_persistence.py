@@ -99,7 +99,7 @@ class SidecarProcess:
 
 @contextmanager
 def sidecar(tmp_path):
-    with tempfile.TemporaryDirectory(prefix='emcp-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='emcp-', dir=Path("/tmp").resolve()) as directory:
         process = SidecarProcess(tmp_path/'checkpoint', Path(directory)/'cp.sock')
         try:
             process.start()

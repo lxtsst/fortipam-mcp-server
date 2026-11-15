@@ -393,7 +393,7 @@ print(json.dumps({"relative_private_reads_denied": True, "database_inputs_denied
 
 @pytest.fixture
 def private_uds_root():
-    with tempfile.TemporaryDirectory(prefix="fpai-", dir="/private/tmp") as root:
+    with tempfile.TemporaryDirectory(prefix="fpai-", dir=Path("/tmp").resolve()) as root:
         yield Path(root)
 
 

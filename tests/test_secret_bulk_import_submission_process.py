@@ -369,7 +369,9 @@ assert denied == len(value["kernel_probe_paths"]) + 1
     pytest.param("encrypted", True, True, "success", id="parent-encrypted-session"),
     pytest.param("encrypted", True, True, "lost-receipt", id="parent-lost-receipt")])
 def test_real_private_submission_separated_roles_without_authority_inputs(kind, kernel, session, parent_mode, capfd, monkeypatch):
-    with tempfile.TemporaryDirectory(prefix="fpais-", dir="/private/tmp") as directory:
+    if kernel and sys.platform != "darwin":
+        pytest.skip("Native macOS isolation is required for this qualification")
+    with tempfile.TemporaryDirectory(prefix="fpais-", dir=Path("/tmp").resolve()) as directory:
         root = Path(directory)
         fixture = setup(root)
         binding, _, _ = prepared(root, kind)

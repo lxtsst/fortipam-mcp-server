@@ -30,7 +30,7 @@ def write(path, raw):
 def test_original_signed_channel_closes_and_reuses_only_its_fixed_socket(tmp_path, monkeypatch, capfd, occupied):
     loggers = [logging.getLogger(name) for name in ('uvicorn.error', 'uvicorn.access', 'uvicorn.asgi')]
     logging_before = [(logger.level, tuple(logger.handlers), logger.propagate) for logger in loggers]
-    with tempfile.TemporaryDirectory(prefix='fp-row-run-', dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='fp-row-run-', dir=Path("/tmp").resolve()) as directory:
         root = Path(directory)
         path = root / 'row.sock'
         request, signer, public = root / 'request.key', root / 'signer.key', root / 'public.key'
