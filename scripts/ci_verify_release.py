@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -10,6 +11,8 @@ import subprocess
 import sys
 import tempfile
 import time
+
+import pytest
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -40,6 +43,28 @@ FAILURE_SIGNALS = (
 )
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption("--ci-shard", type=int, default=1)
+    parser.addoption("--ci-shards", type=int, default=1)
+
+
+def shard_for_test(nodeid: str, count: int) -> int:
+    """Assign every collected test to exactly one stable, one-based shard."""
+    return int.from_bytes(hashlib.sha256(nodeid.encode()).digest()[:8], "big") % count + 1
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    shard, count = config.getoption("--ci-shard"), config.getoption("--ci-shards")
+    if count < 1 or not 1 <= shard <= count:
+        raise pytest.UsageError("CI shard must be between 1 and the positive shard count.")
+    selected: list[pytest.Item] = []
+    deselected: list[pytest.Item] = []
+    for item in items:
+        (selected if shard_for_test(item.nodeid, count) == shard else deselected).append(item)
+    items[:] = selected
+    config.hook.pytest_deselected(items=deselected)
+
+
 def failure_diagnostics(text: str) -> dict[str, object]:
     """Expose only fixed error labels and public test source locations."""
     locations = sorted(set(re.findall(r"\b(tests/test_[A-Za-z0-9_]+\.py:[0-9]+):", text)))
@@ -52,7 +77,7 @@ def failure_phase(text: str) -> str | None:
     return match[1] if match is not None and match[1] in CHECK_NAMES else None
 
 
-def pytest_summary(text: str) -> dict[str, object]:
+def summarize_pytest(text: str) -> dict[str, object]:
     """Return counts and test names, excluding parameters and raw diagnostics."""
     failed: set[str] = set()
     counts: dict[str, int] = {}
@@ -98,7 +123,7 @@ def main() -> int:
                 print(json.dumps({"scope": args.scope, "status": "running",
                                   "elapsed_seconds": int(time.monotonic() - started)}), flush=True)
         diagnostic = logs / "pytest.log" if args.scope == "release" else Path(output.name)
-        summary = pytest_summary(tail_text(diagnostic)) if diagnostic.is_file() else {}
+        summary = summarize_pytest(tail_text(diagnostic)) if diagnostic.is_file() else {}
         diagnostics = failure_diagnostics(tail_text(diagnostic)) if code and diagnostic.is_file() else {}
         print(json.dumps({"scope": args.scope, "status": "passed" if code == 0 else "failed",
                           "exit_code": code, "failed_check": failure_phase(tail_text(Path(output.name))),

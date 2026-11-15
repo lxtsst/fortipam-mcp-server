@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deterministic-release:
-    name: ${{ matrix.name }} (Python ${{ matrix.python-version }})
+    name: ${{ matrix.name }} (Python ${{ matrix.python-version }}, shard ${{ matrix.shard }}/${{ matrix.shards }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -27,16 +27,64 @@ jobs:
             os: ubuntu-24.04
             scope: release
             workers: 4
+            shard: 1
+            shards: 4
+          - name: deterministic-release
+            python-version: "3.11"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+            shard: 2
+            shards: 4
+          - name: deterministic-release
+            python-version: "3.11"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+            shard: 3
+            shards: 4
+          - name: deterministic-release
+            python-version: "3.11"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+            shard: 4
+            shards: 4
           - name: deterministic-release
             python-version: "3.12"
             os: ubuntu-24.04
             scope: release
             workers: 4
+            shard: 1
+            shards: 4
+          - name: deterministic-release
+            python-version: "3.12"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+            shard: 2
+            shards: 4
+          - name: deterministic-release
+            python-version: "3.12"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+            shard: 3
+            shards: 4
+          - name: deterministic-release
+            python-version: "3.12"
+            os: ubuntu-24.04
+            scope: release
+            workers: 4
+            shard: 4
+            shards: 4
           - name: native-macos
             python-version: "3.11"
             os: macos-15
             scope: native-macos
             workers: 2
+            shard: 1
+            shards: 1
 
     steps:
       - name: Check out repository
@@ -92,7 +140,7 @@ jobs:
       - name: Verify deterministic release
         working-directory: ${{ env.FPA_CI_ROOT }}
         env:
-          PYTEST_ADDOPTS: "-n ${{ matrix.workers }} --dist loadfile -ra"
+          PYTEST_ADDOPTS: "-n ${{ matrix.workers }} --dist loadfile -ra -p scripts.ci_verify_release --ci-shard=${{ matrix.shard }} --ci-shards=${{ matrix.shards }}"
           PYTHONHASHSEED: "0"
         run: >-
           python scripts/ci_verify_release.py

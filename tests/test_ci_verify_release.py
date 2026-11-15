@@ -1,11 +1,11 @@
 import pytest
 
 import scripts.ci_verify_release as ci_verify_release
-from scripts.ci_verify_release import pytest_summary
+from scripts.ci_verify_release import summarize_pytest
 
 
 def test_ci_summary_omits_parameters_and_raw_failure_output() -> None:
-    summary = pytest_summary(
+    summary = summarize_pytest(
         "FAILED tests/test_flow.py::test_boundary[SYNTHETIC_PRIVATE_PARAMETER]\n"
         "E AssertionError: SYNTHETIC_RAW_RESPONSE\n"
         "1 failed, 12 passed, 2 skipped in 3.25s\n"
@@ -19,7 +19,7 @@ def test_ci_summary_omits_parameters_and_raw_failure_output() -> None:
 
 
 def test_ci_summary_rejects_non_test_paths_and_deduplicates_parameter_cases() -> None:
-    summary = pytest_summary(
+    summary = summarize_pytest(
         "ERROR /operator/private/state\n"
         "FAILED tests/test_flow.py::TestFlow::test_boundary[first]\n"
         "FAILED tests/test_flow.py::TestFlow::test_boundary[second]\n"
@@ -62,3 +62,13 @@ def test_failure_diagnostics_excludes_exception_values_and_private_paths() -> No
     }
     assert "SYNTHETIC_PRIVATE_VALUE" not in str(result)
     assert "/operator/private" not in str(result)
+
+
+def test_ci_shards_partition_all_cases_without_overlap() -> None:
+    cases = [f"tests/test_flow.py::test_boundary[{index}]" for index in range(1000)]
+    shards = [{case for case in cases if ci_verify_release.shard_for_test(case, 4) == shard}
+              for shard in range(1, 5)]
+    assert set.union(*shards) == set(cases)
+    assert sum(map(len, shards)) == len(cases)
+    assert all(shards)
+    assert all(ci_verify_release.shard_for_test(case, 1) == 1 for case in cases)
