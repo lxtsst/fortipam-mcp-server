@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fortipam-mcp-server"
-version = "4.0.0b108"
+version = "4.0.0b109"
 description = "Governed FortiPAM MCP server with a preserved read-only device surface and an isolated V4 control plane."
 readme = "README.md"
 requires-python = ">=3.11"

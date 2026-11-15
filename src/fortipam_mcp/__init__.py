@@ -1,3 +1,3 @@
 """Local-first governed FortiPAM MCP server."""
 
-__version__ = "4.0.0b108"
+__version__ = "4.0.0b109"

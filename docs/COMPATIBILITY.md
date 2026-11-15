@@ -11,7 +11,7 @@ Stdio and Streamable HTTP are supported. V4 planning/control require their
 authenticated HTTP bindings. Discover the actual registered tools from the
 running server; an implementation module or registry row is not a live tool.
 
-Version 4.0.0b108 is a Beta. Read-only contracts and the packaged API discovery
+Version 4.0.0b109 is a Beta. Read-only contracts and the packaged API discovery
 metadata originate from FortiPAM 1.9.x. Selected controlled workflow code has
 version-specific branches, including FortiPAM 7.0.0 build 29. These branches
 do not establish general compatibility with every release or workflow.

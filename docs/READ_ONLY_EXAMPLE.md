@@ -12,13 +12,14 @@ dependencies; the example itself makes no appliance or external API calls.
 
 ## Run the offline example
 
-Use Python 3.11 or 3.12 on macOS or Linux. From a new checkout of `main`:
+Use Python 3.11 or 3.12 on macOS or Linux. From the current V4 source release:
 
 ```bash
 git clone https://github.com/lxtsst/fortipam-mcp-server.git
 cd fortipam-mcp-server
+git checkout v4.0.0-beta.109
 python3 -m venv .venv
-.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt hatchling==1.32.0 -e .
+.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt .
 ```
 
 Run this from that directory. It starts a child server in the `readonly` profile,
@@ -72,7 +73,7 @@ PYTHON
 
 ## Expected result
 
-For runtime version `4.0.0b108`, the printed summaries have these values:
+For runtime version `4.0.0b109`, the printed summaries have these values:
 
 | Query | Expected result |
 | --- | --- |

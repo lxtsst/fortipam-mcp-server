@@ -4,8 +4,10 @@
 
 面向 FortiPAM 状态检查、运维排障、管理规划和显式启用受控工作流的独立自托管 MCP Server。
 
-**当前版本：4.0.0b108（Beta）**。这是预发布版本，不代表生产环境认证。
-此前的公开源码版本仍可通过 [v3.1.3](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v3.1.3) 获取。
+**当前版本：4.0.0b109（Beta）**。这是预发布版本，不代表生产环境认证。
+[下载当前 V4 源码](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v4.0.0-beta.109)。
+由于 V4 是预发布版本，GitHub 可能仍将旧 [v3.1.3](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v3.1.3)
+标为 Latest；V3 不包含 V4 能力。
 
 本项目不是 Fortinet 官方产品，也未获得 Fortinet 背书。
 Fortinet 和 FortiPAM 是 Fortinet, Inc. 的商标。
@@ -28,20 +30,29 @@ Fortinet 和 FortiPAM 是 Fortinet, Inc. 的商标。
 [运行离线 MCP 示例](docs/READ_ONLY_EXAMPLE.md)：无需设备或凭据，通过真实 MCP 调用
 查询两个 API 操作的风险分类，并获取 FortiAnalyzer 日志投递排查建议。
 示例包含预期结果，也说明了配置自有授权设备后如何进行固定状态读取。
-请使用 `main` 分支中的示例。
 
 ## 安装与验证
 
-使用 Python 3.11 或 3.12：
+在 macOS 或 Linux 上使用 Python 3.11 或 3.12，并创建独立环境。
+以下仅安装运行依赖，不安装开发测试或可选工作流依赖：
 
 ```bash
 git clone https://github.com/lxtsst/fortipam-mcp-server.git
 cd fortipam-mcp-server
-git checkout v4.0.0-beta.108
+git checkout v4.0.0-beta.109
 python3 -m venv .venv
-.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt hatchling==1.32.0 -e '.[dev]'
-.venv/bin/python scripts/verify_release.py
+.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt .
+.venv/bin/python -m pip check
+.venv/bin/fortipam-mcp-smoke
+.venv/bin/fortipam-mcp-http-smoke
 ```
+
+这些离线检查验证 MCP 初始化、28 个 Tool、5 个 Resource、7 个 Prompt；
+HTTP 检查还验证未认证请求被拒绝。检查不连接 FortiPAM 设备。
+完整开发与发布检查见[贡献说明](CONTRIBUTING.md)。
+
+项目通过 GitHub 源码 Release 分发。上述命令在本地构建并安装 Python 包，
+不依赖已发布的 PyPI 包或 GHCR 镜像。可选工作流插件与 Server 独立编号。
 
 启动默认 stdio Server：
 
@@ -49,11 +60,17 @@ python3 -m venv .venv
 .venv/bin/fortipam-mcp-server
 ```
 
+stdio 会等待 MCP 客户端连接，不是交互式终端。支持本地 stdio 的客户端
+应将启动命令设为 `.venv/bin/fortipam-mcp-server` 的**绝对路径**，无需参数。
+
 仅在 loopback 启动 HTTP：
 
 ```bash
 FORTIPAM_MCP_HTTP_AUTH_MODE=none .venv/bin/fortipam-mcp-http
 ```
+
+支持 HTTP 的 MCP 客户端连接 `http://127.0.0.1:8000/mcp`。
+可选插件中的 HTTPS 地址是占位示例，必须替换为自己的部署地址。
 
 远程 HTTP 必须配置 HTTPS 和适当的 OAuth。详见
 [部署说明](docs/DEPLOYMENT.md)、[Profile 与兼容限制](docs/COMPATIBILITY.md)及

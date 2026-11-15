@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.0b109 — Beta
+
+- Updates the installation guide with runtime-only installation and offline MCP checks.
+- Adds a reproducible read-only walkthrough and separates contributor test dependencies.
+- Includes Linux test portability fixes and sharded Python 3.11/3.12 release checks,
+  with a separate macOS native-isolation job.
+- Preserves existing workflow availability, authorization boundaries, and limitations.
+
 ## 4.0.0b108 — Beta
 
 - Adds separate administrative planning and explicitly bound controlled profiles.

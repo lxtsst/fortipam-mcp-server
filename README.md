@@ -5,8 +5,10 @@
 An independent, self-hosted MCP server for FortiPAM posture checks, operational
 diagnostics, administrative planning, and explicitly enabled controlled workflows.
 
-**Version: 4.0.0b108 (Beta).** This is a pre-release, not a production certification.
-The previous source release remains available as [v3.1.3](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v3.1.3).
+**Version: 4.0.0b109 (Beta).** This is a pre-release, not a production certification.
+[Download the current V4 source](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v4.0.0-beta.109).
+GitHub may label the older [v3.1.3](https://github.com/lxtsst/fortipam-mcp-server/releases/tag/v3.1.3)
+release as Latest because V4 is a pre-release. V3 does not include V4 capabilities.
 
 This is not an official Fortinet product and is not endorsed by Fortinet.
 Fortinet and FortiPAM are trademarks of Fortinet, Inc.
@@ -31,21 +33,32 @@ enabled actions. All execution gates are closed by default.
 [Run the offline MCP walkthrough](docs/READ_ONLY_EXAMPLE.md) to classify two
 API operations and retrieve a FortiAnalyzer delivery evidence plan without a
 device or credentials. It includes expected output and a separate guide to a
-fixed live status read on your own authorized appliance. Use the `main` checkout
-for this walkthrough.
+fixed live status read on your own authorized appliance.
 
 ## Install and verify
 
-Use Python 3.11 or 3.12 in a dedicated environment:
+Use Python 3.11 or 3.12 on macOS or Linux in a dedicated environment.
+The following installs the runtime without development or optional workflow dependencies:
 
 ```bash
 git clone https://github.com/lxtsst/fortipam-mcp-server.git
 cd fortipam-mcp-server
-git checkout v4.0.0-beta.108
+git checkout v4.0.0-beta.109
 python3 -m venv .venv
-.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt hatchling==1.32.0 -e '.[dev]'
-.venv/bin/python scripts/verify_release.py
+.venv/bin/python -m pip install --constraint deploy/docker/runtime-constraints.txt .
+.venv/bin/python -m pip check
+.venv/bin/fortipam-mcp-smoke
+.venv/bin/fortipam-mcp-http-smoke
 ```
+
+These offline checks verify MCP initialization, 28 tools, five resources, and
+seven prompts; the HTTP check also verifies rejection without authentication.
+They do not contact a FortiPAM appliance. Full development/release checks are
+documented in [Contributing](CONTRIBUTING.md).
+
+Distribution uses GitHub source releases. The commands here build and install a
+local Python package; no published PyPI package or GHCR image is required.
+The optional workflow plugin has its own version, separate from the server.
 
 Start the default stdio server:
 
@@ -53,11 +66,19 @@ Start the default stdio server:
 .venv/bin/fortipam-mcp-server
 ```
 
+Stdio waits for an MCP client; it is not an interactive shell. In a client that
+supports local stdio servers, set the command to the **absolute path** of
+`.venv/bin/fortipam-mcp-server`, with no arguments.
+
 For a loopback-only HTTP server:
 
 ```bash
 FORTIPAM_MCP_HTTP_AUTH_MODE=none .venv/bin/fortipam-mcp-http
 ```
+
+Connect an HTTP-capable MCP client to `http://127.0.0.1:8000/mcp`.
+The optional plugin contains an example HTTPS endpoint that must be replaced
+with your own deployment URL.
 
 Remote HTTP requires HTTPS and an appropriate OAuth configuration. See
 [deployment](docs/DEPLOYMENT.md), [profiles and compatibility](docs/COMPATIBILITY.md),

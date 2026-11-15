@@ -1,7 +1,7 @@
 *
 !Dockerfile
 !LICENSE
-!dist/fortipam_mcp_server-4.0.0b108-py3-none-any.whl
+!dist/fortipam_mcp_server-4.0.0b109-py3-none-any.whl
 !deploy/
 !deploy/docker/
 !deploy/docker/runtime-constraints.txt
