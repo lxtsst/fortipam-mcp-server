@@ -50,6 +50,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      - name: Set up standalone Python manager for native isolation
+        if: runner.os == 'macOS'
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        with:
+          version: "0.12.10"
+          enable-cache: false
+
       - name: Prepare short source path for Unix sockets
         shell: bash
         run: |
@@ -63,7 +70,11 @@ jobs:
         working-directory: ${{ env.FPA_CI_ROOT }}
         shell: bash
         run: |
-          python -m venv .venv
+          if [ "$RUNNER_OS" = macOS ]; then
+            uv venv --seed --managed-python --python 3.11.16 .venv
+          else
+            python -m venv .venv
+          fi
           printf '%s/.venv/bin\n' "$FPA_CI_ROOT" >> "$GITHUB_PATH"
 
       - name: Install project and development dependencies
