@@ -23,6 +23,13 @@ Fortinet 和 FortiPAM 是 Fortinet, Inc. 的商标。
 暴露 97 个 Tool，不能执行设备变更。`v4-controlled` 仅注册显式绑定且逐项启用的动作；
 所有执行 Gate 默认关闭。
 
+## 试用只读示例
+
+[运行离线 MCP 示例](docs/READ_ONLY_EXAMPLE.md)：无需设备或凭据，通过真实 MCP 调用
+查询两个 API 操作的风险分类，并获取 FortiAnalyzer 日志投递排查建议。
+示例包含预期结果，也说明了配置自有授权设备后如何进行固定状态读取。
+请使用 `main` 分支中的示例。
+
 ## 安装与验证
 
 使用 Python 3.11 或 3.12：

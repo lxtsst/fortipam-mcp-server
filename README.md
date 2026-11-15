@@ -26,6 +26,14 @@ The default profile exposes 28 read-only/offline tools. The authenticated HTTP
 The `v4-controlled` profile registers only explicitly bound and individually
 enabled actions. All execution gates are closed by default.
 
+## Try a read-only example
+
+[Run the offline MCP walkthrough](docs/READ_ONLY_EXAMPLE.md) to classify two
+API operations and retrieve a FortiAnalyzer delivery evidence plan without a
+device or credentials. It includes expected output and a separate guide to a
+fixed live status read on your own authorized appliance. Use the `main` checkout
+for this walkthrough.
+
 ## Install and verify
 
 Use Python 3.11 or 3.12 in a dedicated environment:
