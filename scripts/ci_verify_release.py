@@ -68,8 +68,18 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 def failure_diagnostics(text: str) -> dict[str, object]:
     """Expose only fixed error labels and public test source locations."""
     locations = sorted(set(re.findall(r"\b(tests/test_[A-Za-z0-9_]+\.py:[0-9]+):", text)))
-    return {"failure_signals": [label for label in FAILURE_SIGNALS if label in text],
-            "failure_locations": locations}
+    diagnostics: dict[str, object] = {
+        "failure_signals": [label for label in FAILURE_SIGNALS if label in text],
+        "failure_locations": locations,
+    }
+    exit_match = re.search(
+        r"assert handles\[0\]\._process\.returncode == expected_exit\[fault\]\nE\s+assert (-?[0-9]+) == ([0-9]+)", text,
+    )
+    if exit_match is not None:
+        actual, expected = map(int, exit_match.groups())
+        if -128 <= actual <= 255 and 0 <= expected <= 255:
+            diagnostics["worker_exit"] = {"actual": actual, "expected": expected}
+    return diagnostics
 
 
 def failure_phase(text: str) -> str | None:

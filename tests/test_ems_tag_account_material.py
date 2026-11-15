@@ -195,7 +195,12 @@ def test_unrecognized_central_state_never_replays_or_truncates(tmp_path,monkeypa
         elif fault=='foreign_tail':
             with h.env.open('ab') as f:f.write(b'FOREIGN_TAIL=synthetic\n')
         else:
-            raw=h.env.read_bytes();h.env.unlink();h.env.write_bytes(raw);h.env.chmod(0o600)
+            # Keep the original inode allocated until the replacement exists.
+            # Unlink/recreate may immediately reuse its inode on Linux.
+            replacement=h.env.with_name(h.env.name+'.replacement')
+            replacement.write_bytes(h.env.read_bytes());replacement.chmod(0o600)
+            assert replacement.stat().st_ino != h.env.stat().st_ino
+            replacement.replace(h.env)
         current=h.env.read_bytes()
         with pytest.raises(ValueError):h.enrollment.retire_unused_once()
         assert h.env.read_bytes()==current

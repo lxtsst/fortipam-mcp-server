@@ -82,7 +82,7 @@ jobs:
             python-version: "3.11"
             os: macos-15
             scope: native-macos
-            workers: 2
+            workers: 1
             shard: 1
             shards: 1
 

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import selectors
 import socket
 import struct
 import subprocess
@@ -88,6 +89,8 @@ def worker_main(descriptor, fault, pins_path=None):
         connections.append(connection)
         return connection
     worker = _OriginalRowActionWorker(config, guard, pins, connection_factory=connect)
+    if pins_path is None:
+        print('ready', flush=True)
     worker.serve_once(socket.socket(fileno=descriptor))
     retry, observer = socket.socketpair()
     before = len(requests)
@@ -120,6 +123,12 @@ def test_separate_product_process_fixed_handoff_and_terminal_failure(fault, capf
     defaults, payload, _ = data()
     result = None
     try:
+        # Start the action budget after imports and fixture construction, while
+        # keeping subprocess startup bounded separately.
+        with selectors.DefaultSelector() as selector:
+            selector.register(process.stdout, selectors.EVENT_READ)
+            assert selector.select(10), 'Synthetic product process did not start'
+            assert process.stdout.readline() == b'ready\n'
         cap = time.monotonic() + 3
         _send(parent, deadline, b'P' + bytes.fromhex('0' * 64 if fault == 'context' else CONTEXT)
             + struct.pack('!d', deadline + 60 if fault == 'deadline-growth' else cap))

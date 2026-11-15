@@ -72,3 +72,11 @@ def test_ci_shards_partition_all_cases_without_overlap() -> None:
     assert sum(map(len, shards)) == len(cases)
     assert all(shards)
     assert all(ci_verify_release.shard_for_test(case, 1) == 1 for case in cases)
+
+
+def test_ci_worker_exit_diagnostic_accepts_only_the_fixed_exit_assertion() -> None:
+    result = ci_verify_release.failure_diagnostics(
+        'assert handles[0]._process.returncode == expected_exit[fault]\nE assert -9 == 16\n'
+    )
+    assert result['worker_exit'] == {'actual': -9, 'expected': 16}
+    assert 'worker_exit' not in ci_verify_release.failure_diagnostics('E assert 12345 == 16')
