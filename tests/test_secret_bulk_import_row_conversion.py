@@ -6,8 +6,11 @@ import json
 import pickle
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
+
+from fortipam_mcp import secret_bulk_import_row_conversion as conversion
 
 from fortipam_mcp.secret_bulk_import_dependencies import (
     ImportTemplate, ImportTemplateField, ResolvedImportDependencies, dependency_catalog_digest,
@@ -64,7 +67,9 @@ def fixture(tmp_path, monkeypatch, *, association="", index=0, fault=None, targe
             if fault == "deadline":
                 deadline += 1
             elif fault == "idle":
-                deadline = time.monotonic() + 0.1
+                clock = [time.monotonic()]
+                deadline = clock[0] + 0.1
+                monkeypatch.setattr(conversion, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
             try:
                 with self.converter._convert_once(use_context, columns, deadline=deadline) as view:
                     self.body_view, self.body = view, view.obj
@@ -79,7 +84,10 @@ def fixture(tmp_path, monkeypatch, *, association="", index=0, fault=None, targe
                     if fault == "cancel":
                         session.close()
                     if fault == "idle":
-                        time.sleep(0.18)
+                        clock[0] = deadline
+                        wait_until = time.monotonic() + 3
+                        while any(self.body) and time.monotonic() < wait_until:
+                            threading.Event().wait(0.01)
                         assert not any(self.body)
                 return SecretCreateAdapterOutcome.VERIFIED_CREATED
             finally:

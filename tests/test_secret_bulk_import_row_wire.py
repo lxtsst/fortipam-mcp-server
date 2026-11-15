@@ -6,10 +6,12 @@ import json
 import pickle
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
 from fortipam_mcp import secret_bulk_import_row_wire as wire
+from fortipam_mcp import secret_bulk_import_row_conversion as conversion
 from fortipam_mcp.secret_bulk_import_intake import BulkImportIntakeError
 from fortipam_mcp.secret_bulk_import_row_provider import _OriginalRowMaterialRuntime
 from fortipam_mcp.secret_metadata_http_transport import _SECRET_CREATE_191_REQUIRED_DEFAULTS
@@ -166,14 +168,22 @@ def test_wire_and_dto_owned_bytes_clear_together_on_uncertain_exit(tmp_path, mon
         calls = 0
         def _create_and_verify_with_original_row(self, context, columns, *, deadline):
             self.calls += 1
-            if fault == 'idle':deadline = time.monotonic()+0.1
+            if fault == 'idle':
+                clock = [time.monotonic()]
+                deadline = clock[0] + 0.1
+                # Expire only after the owned wire buffer exists; CPU scheduling
+                # must not turn this disposal test into a serialization timeout.
+                monkeypatch.setattr(conversion, 'time', SimpleNamespace(monotonic=lambda: clock[0]))
             with encoder._serialize_once(context,columns,deadline=deadline) as view:
                 self.body = view.obj
                 if fault == 'consumer':raise ValueError('Synthetic fixed downstream failure')
                 if fault == 'cancel':session.close()
                 if fault == 'interrupt':raise KeyboardInterrupt
                 if fault == 'idle':
-                    time.sleep(0.18)
+                    clock[0] = deadline
+                    wait_until = time.monotonic() + 3
+                    while any(self.body) and time.monotonic() < wait_until:
+                        threading.Event().wait(0.01)
                     assert not any(self.body)
             return SecretCreateAdapterOutcome.VERIFIED_CREATED
     transport = Transport();bridge._transport = transport
