@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from mcp.server.mcpserver.exceptions import ToolError
+
 from v4_planning.material_provider import _OpaqueC3Object
 
 from .secret_bulk_import_text_batch_owner import _OriginalTextBatchOwner
@@ -49,17 +51,22 @@ def register_secret_bulk_import_candidate_tools(
     if type(action) is not SecretBulkImportMcpAction:
         raise ValueError(_ERROR)
 
+    async def invoke(operation: str, reference: str | None = None) -> dict[str, object]:
+        try:
+            principal = (server._v4_planning_principal() if operation == "preview"
+                         else server._v4_secret_metadata_action_principal())
+            return await asyncio.to_thread(action.call, operation, principal, reference)
+        except Exception:
+            raise ToolError(_ERROR) from None
+
     async def preview() -> dict[str, object]:
-        return await asyncio.to_thread(
-            action.call, "preview", server._v4_planning_principal())
+        return await invoke("preview")
 
     async def authorize(preview_ref: str) -> dict[str, object]:
-        return await asyncio.to_thread(
-            action.call, "authorize", server._v4_secret_metadata_action_principal(), preview_ref)
+        return await invoke("authorize", preview_ref)
 
     async def execute(authorization_ref: str) -> dict[str, object]:
-        return await asyncio.to_thread(
-            action.call, "execute", server._v4_secret_metadata_action_principal(), authorization_ref)
+        return await invoke("execute", authorization_ref)
 
     server.mcp.tool(
         name="preview_v4_secret_bulk_import_text_700",

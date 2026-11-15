@@ -5,6 +5,8 @@ import asyncio
 import re
 from typing import Any, Callable, Literal
 
+from mcp.server.mcpserver.exceptions import ToolError
+
 from .isolated_folder_policy_transition_live_workflow import (
     CONTRACT, IsolatedFolderPolicyTransitionLiveWorkflow,
 )
@@ -172,7 +174,7 @@ def register_isolated_folder_policy_transition_candidate_tools(
             principal = server._v4_planning_principal() if preview else server._v4_folder_action_principal()
             return await asyncio.to_thread(lambda: method(*args, principal))
         except Exception:
-            raise IsolatedFolderPolicyTransitionMcpActionError(UNAVAILABLE) from None
+            raise ToolError(UNAVAILABLE) from None
 
     @server.mcp.tool(description="Preview the fixed privately bound isolated Folder Policy assignment; no write.",
                      annotations=READ_ONLY_TOOL_ANNOTATIONS)
