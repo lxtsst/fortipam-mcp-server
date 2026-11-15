@@ -33,6 +33,18 @@ CHECK_FAILURE = re.compile(r"Release verification check '([a-z_]+)' failed with 
 CHECK_NAMES = frozenset(check.name for check in deterministic_checks(sys.executable)) | {
     "wheel_build", "wheel_install", "installed_import", "installed_mcp_stdio",
 }
+FAILURE_SIGNALS = (
+    "Operation not permitted", "Permission denied", "ModuleNotFoundError",
+    "ImportError", "Library not loaded", "Fatal Python error", "sandbox-exec:",
+    "ConnectionResetError", "BrokenPipeError", "TimeoutError", "AssertionError",
+)
+
+
+def failure_diagnostics(text: str) -> dict[str, object]:
+    """Expose only fixed error labels and public test source locations."""
+    locations = sorted(set(re.findall(r"\b(tests/test_[A-Za-z0-9_]+\.py:[0-9]+):", text)))
+    return {"failure_signals": [label for label in FAILURE_SIGNALS if label in text],
+            "failure_locations": locations}
 
 
 def failure_phase(text: str) -> str | None:
@@ -87,9 +99,10 @@ def main() -> int:
                                   "elapsed_seconds": int(time.monotonic() - started)}), flush=True)
         diagnostic = logs / "pytest.log" if args.scope == "release" else Path(output.name)
         summary = pytest_summary(tail_text(diagnostic)) if diagnostic.is_file() else {}
+        diagnostics = failure_diagnostics(tail_text(diagnostic)) if code and diagnostic.is_file() else {}
         print(json.dumps({"scope": args.scope, "status": "passed" if code == 0 else "failed",
                           "exit_code": code, "failed_check": failure_phase(tail_text(Path(output.name))),
-                          **summary}), flush=True)
+                          **summary, **diagnostics}), flush=True)
         return code if code >= 0 else 1
 
 

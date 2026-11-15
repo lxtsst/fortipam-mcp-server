@@ -48,3 +48,17 @@ def test_failure_phase_exposes_only_known_check_names() -> None:
     assert ci_verify_release.failure_phase(
         "Release verification check 'synthetic_private_value' failed with exit code 1."
     ) is None
+
+
+def test_failure_diagnostics_excludes_exception_values_and_private_paths() -> None:
+    result = ci_verify_release.failure_diagnostics(
+        "tests/test_flow.py:42: AssertionError\n"
+        "E BrokenPipeError: SYNTHETIC_PRIVATE_VALUE\n"
+        "/operator/private/state:19: Permission denied\n"
+    )
+    assert result == {
+        "failure_signals": ["Permission denied", "BrokenPipeError", "AssertionError"],
+        "failure_locations": ["tests/test_flow.py:42"],
+    }
+    assert "SYNTHETIC_PRIVATE_VALUE" not in str(result)
+    assert "/operator/private" not in str(result)
