@@ -2,8 +2,8 @@
 # Transitive dependencies remain resolver-managed for Python/platform compatibility.
 asyncssh==2.24.0
 httpx==0.28.1
-mcp==2.0.0
-PyJWT==2.13.0
+mcp==2.2.0
+PyJWT==2.15.0
 PyYAML==6.0.3
 truststore==0.10.4
 uvicorn==0.52.4

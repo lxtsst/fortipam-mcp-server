@@ -23,10 +23,10 @@ classifiers = [
 dependencies = [
     "asyncssh>=2.24.0,<3.0.0",
     "httpx>=0.28.0,<1.0.0",
-    "mcp>=2.0.0,<3.0.0",
+    "mcp>=2.2.0,<3.0.0",
     "pydantic>=2.0.0,<3.0.0",
     "PyYAML>=6.0.0,<7.0.0",
-    "PyJWT[crypto]>=2.10.0,<3.0.0",
+    "PyJWT[crypto]>=2.15.0,<3.0.0",
     "truststore>=0.10.4,<1.0.0",
     "uvicorn>=0.30.0,<1.0.0",
 ]

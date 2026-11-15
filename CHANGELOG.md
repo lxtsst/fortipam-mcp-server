@@ -2,6 +2,8 @@
 
 ## 4.0.0b109 — Beta
 
+- Requires MCP SDK 2.2.0 and PyJWT 2.15.0 or later within their existing major
+  versions, addressing known upstream dependency advisories.
 - Updates the installation guide with runtime-only installation and offline MCP checks.
 - Adds a reproducible read-only walkthrough and separates contributor test dependencies.
 - Includes Linux test portability fixes and sharded Python 3.11/3.12 release checks,

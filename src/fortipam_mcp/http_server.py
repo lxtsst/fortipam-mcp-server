@@ -3811,6 +3811,8 @@ def create_http_app(
             issuer_url=AnyHttpUrl(settings.oauth_issuer),
             resource_server_url=AnyHttpUrl(settings.public_url),
             required_scopes=list(settings.oauth_required_scopes),
+            # OAuthJwtTokenVerifier validates the configured audience itself.
+            validate_token_resource=False,
         )
         token_verifier = OAuthJwtTokenVerifier(
             issuer=settings.oauth_issuer,
@@ -3827,6 +3829,8 @@ def create_http_app(
             issuer_url=AnyHttpUrl(settings.local_oauth.issuer),
             resource_server_url=AnyHttpUrl(settings.public_url),
             required_scopes=[settings.local_oauth.scope],
+            # LocalOAuthProvider rejects tokens for any other resource.
+            validate_token_resource=False,
         )
         token_verifier = ProviderTokenVerifier(provider)
         custom_http_routes.extend(provider.authorization_routes())

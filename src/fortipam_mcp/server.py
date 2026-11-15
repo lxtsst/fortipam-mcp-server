@@ -13799,8 +13799,8 @@ def _configure_safe_dependency_logging() -> None:
 def _harden_mcp_input_validation(mcp_server: Any) -> None:
     """Make MCP Tool and Prompt validation strict without reflecting values.
 
-    MCP SDK 2.0.0 builds Pydantic argument models with the default ``extra``
-    behavior, which silently ignores unknown members. The project pins that SDK
+    MCP SDK 2.x builds Pydantic argument models with the default ``extra``
+    behavior, which silently ignores unknown members. The project uses that SDK
     line, so harden every registered tool model after registration and fail
     startup if the expected manager or schema behavior changes. Reject
     undeclared Tool and Prompt members before their SDK runners, and sanitize
